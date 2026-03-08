@@ -3,6 +3,7 @@ package com.shinjikai.dictionary
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.speech.tts.TextToSpeech
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -63,6 +65,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -112,6 +115,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.text.DateFormat
 import java.util.Date
+import java.util.Locale
 
 private enum class Screen {
     Search,
@@ -144,6 +148,8 @@ fun ShinjikaiApp(
     val clipboardManager = LocalClipboardManager.current
     val importClient = remember { OkHttpClient() }
     val yomitanImporter = remember(database) { YomitanImporter(database) }
+    var textToSpeech by remember(context) { mutableStateOf<TextToSpeech?>(null) }
+    var canSpeakJapanese by remember { mutableStateOf(false) }
     var useOfflineMode by remember { mutableStateOf(false) }
     var isImportingOfflineData by remember { mutableStateOf(false) }
     var offlineImportProgress by remember { mutableStateOf(0f) }
@@ -210,6 +216,30 @@ fun ShinjikaiApp(
     var activeCategoryId by remember { mutableStateOf<Int?>(null) }
     var activeCategoryName by remember { mutableStateOf<String?>(null) }
     var attemptedCategoryPreload by remember(dictionarySource) { mutableStateOf(false) }
+
+    DisposableEffect(context) {
+        var disposed = false
+        val instance = TextToSpeech(context) { status ->
+            if (disposed) return@TextToSpeech
+            if (status == TextToSpeech.SUCCESS) {
+                val result = textToSpeech?.setLanguage(Locale.JAPANESE) ?: TextToSpeech.LANG_NOT_SUPPORTED
+                canSpeakJapanese = result != TextToSpeech.LANG_MISSING_DATA &&
+                    result != TextToSpeech.LANG_NOT_SUPPORTED
+            } else {
+                canSpeakJapanese = false
+            }
+        }
+        instance.setSpeechRate(0.92f)
+        instance.setPitch(1.0f)
+        textToSpeech = instance
+        onDispose {
+            disposed = true
+            canSpeakJapanese = false
+            textToSpeech?.stop()
+            textToSpeech?.shutdown()
+            textToSpeech = null
+        }
+    }
 
     LaunchedEffect(Unit) {
         bookmarkedItems.clear()
@@ -973,6 +1003,25 @@ fun ShinjikaiApp(
                                     kanji = kanji,
                                     kana = kana,
                                     chips = metadataChips,
+                                    onSpeakKana = {
+                                        val textToSpeak = kana.trim().takeIf { it.isNotEmpty() && it != "-" }
+                                        when {
+                                            textToSpeak == null -> {
+                                                Toast.makeText(context, "\u0644\u0627 \u062a\u0648\u062c\u062f \u0642\u0631\u0627\u0621\u0629", Toast.LENGTH_SHORT).show()
+                                            }
+                                            !canSpeakJapanese || textToSpeech == null -> {
+                                                Toast.makeText(context, "\u0627\u0644\u0635\u0648\u062a \u0627\u0644\u064a\u0627\u0628\u0627\u0646\u064a \u063a\u064a\u0631 \u0645\u062a\u0627\u062d \u062f\u0648\u0646 \u0627\u062a\u0635\u0627\u0644", Toast.LENGTH_SHORT).show()
+                                            }
+                                            else -> {
+                                                textToSpeech?.speak(
+                                                    textToSpeak,
+                                                    TextToSpeech.QUEUE_FLUSH,
+                                                    null,
+                                                    "word-kana-${item.id}"
+                                                )
+                                            }
+                                        }
+                                    },
                                     onCategoryClick = { categoryChip ->
                                         navigateTo(Screen.Search)
                                         focusManager.clearFocus()
@@ -1719,6 +1768,7 @@ private fun DetailWordHeaderCard(
     kanji: String,
     kana: String,
     chips: List<CategoryChipModel>,
+    onSpeakKana: () -> Unit,
     onCategoryClick: (CategoryChipModel) -> Unit,
     onKanjiClick: () -> Unit
 ) {
@@ -1737,11 +1787,22 @@ private fun DetailWordHeaderCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = kana,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = kana,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                IconButton(onClick = onSpeakKana) {
+                    Icon(
+                        imageVector = Icons.Default.VolumeUp,
+                        contentDescription = "Read kana"
+                    )
+                }
+            }
             Text(
                 text = kanji,
                 style = MaterialTheme.typography.displaySmall,
