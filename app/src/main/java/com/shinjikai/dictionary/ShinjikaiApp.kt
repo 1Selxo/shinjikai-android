@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -32,7 +33,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.ClearAll
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.outlined.BookmarkBorder
@@ -42,6 +45,7 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,8 +57,6 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -62,10 +64,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -104,6 +106,7 @@ import com.shinjikai.dictionary.data.ShinjikaiRepository
 import com.shinjikai.dictionary.data.WordDetailsResponse
 import com.shinjikai.dictionary.data.AppDatabase
 import com.shinjikai.dictionary.data.BookmarkRepository
+import com.shinjikai.dictionary.data.BookmarkItem
 import com.shinjikai.dictionary.data.LocalYomitanSource
 import com.shinjikai.dictionary.data.RemoteDictionarySource
 import com.shinjikai.dictionary.data.YomitanImporter
@@ -114,6 +117,11 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.text.DateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Date
 import java.util.Locale
 
@@ -205,8 +213,10 @@ fun ShinjikaiApp(
     var isDarkMode by remember { mutableStateOf(true) }
     var useDynamicColor by remember { mutableStateOf(false) }
     var isSearchFieldFocused by remember { mutableStateOf(false) }
-    var pendingBookmarkDeletion by remember { mutableStateOf<SearchItem?>(null) }
-    val bookmarkedItems = remember { mutableStateListOf<SearchItem>() }
+    var isBookmarkEditMode by remember { mutableStateOf(false) }
+    var selectedBookmarkIds by remember { mutableStateOf(emptySet<Int>()) }
+    var pendingBookmarkDeletionIds by remember { mutableStateOf<Set<Int>?>(null) }
+    val bookmarkedItems = remember { mutableStateListOf<BookmarkItem>() }
     val recentSearches = remember {
         mutableStateListOf<String>().apply {
             addAll(loadRecentSearches(context))
@@ -900,7 +910,7 @@ fun ShinjikaiApp(
                                                     } else {
                                                         bookmarkRepository.upsert(item)
                                                         bookmarkedItems.removeAll { it.id == item.id }
-                                                        bookmarkedItems.add(0, item)
+                                                        bookmarkedItems.add(0, BookmarkItem(item = item, createdAt = System.currentTimeMillis()))
                                                     }
                                                 }
                                             }
@@ -1096,7 +1106,6 @@ fun ShinjikaiApp(
                         }
                             }
                     }
-
                     Screen.Bookmarks -> {
                         Scaffold(
                             topBar = {
@@ -1106,7 +1115,13 @@ fun ShinjikaiApp(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Text(appName)
+                                            Text(
+                                                if (isBookmarkEditMode) {
+                                                    "${selectedBookmarkIds.size} \u0645\u062d\u062f\u062f"
+                                                } else {
+                                                    "\u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0627\u062a"
+                                                }
+                                            )
                                             ModeBadge(useOfflineMode = useOfflineMode)
                                         }
                                     },
@@ -1116,6 +1131,55 @@ fun ShinjikaiApp(
                                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                                 contentDescription = "\u0631\u062c\u0648\u0639"
                                             )
+                                        }
+                                    },
+                                    actions = {
+                                        if (isBookmarkEditMode) {
+                                            val allIds = bookmarkedItems.map { it.id }.toSet()
+                                            val isAllSelected = allIds.isNotEmpty() && selectedBookmarkIds.size == allIds.size
+
+                                            IconButton(
+                                                onClick = {
+                                                    selectedBookmarkIds = if (isAllSelected) emptySet() else allIds
+                                                }
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.ClearAll,
+                                                    contentDescription = "\u062a\u062d\u062f\u064a\u062f \u0627\u0644\u0643\u0644"
+                                                )
+                                            }
+
+                                            IconButton(
+                                                onClick = {
+                                                    if (selectedBookmarkIds.isNotEmpty()) {
+                                                        pendingBookmarkDeletionIds = selectedBookmarkIds
+                                                    }
+                                                }
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "\u062d\u0630\u0641"
+                                                )
+                                            }
+
+                                            IconButton(
+                                                onClick = {
+                                                    isBookmarkEditMode = false
+                                                    selectedBookmarkIds = emptySet()
+                                                }
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Done,
+                                                    contentDescription = "\u062a\u0645"
+                                                )
+                                            }
+                                        } else {
+                                            IconButton(onClick = { isBookmarkEditMode = true }) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Edit,
+                                                    contentDescription = "\u0625\u062f\u0627\u0631\u0629"
+                                                )
+                                            }
                                         }
                                     }
                                 )
@@ -1136,6 +1200,50 @@ fun ShinjikaiApp(
                                     )
                                 }
                             } else {
+                                val locale = Locale.getDefault()
+                                val dateFormatter = remember(locale) {
+                                    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+                                }
+                                val timeFormatter = remember(locale) {
+                                    DateTimeFormatter.ofPattern("HH:mm", locale)
+                                }
+
+                                fun localDateOf(epochMs: Long): LocalDate {
+                                    return Instant.ofEpochMilli(epochMs)
+                                        .atZone(ZoneId.systemDefault())
+                                        .toLocalDate()
+                                }
+
+                                fun localTimeLabel(epochMs: Long): String {
+                                    return Instant.ofEpochMilli(epochMs)
+                                        .atZone(ZoneId.systemDefault())
+                                        .toLocalTime()
+                                        .format(timeFormatter)
+                                }
+
+                                fun toggleSelection(id: Int) {
+                                    selectedBookmarkIds = if (selectedBookmarkIds.contains(id)) {
+                                        selectedBookmarkIds - id
+                                    } else {
+                                        selectedBookmarkIds + id
+                                    }
+                                }
+
+                                LaunchedEffect(isBookmarkEditMode, bookmarkedItems.size) {
+                                    if (!isBookmarkEditMode) {
+                                        selectedBookmarkIds = emptySet()
+                                        return@LaunchedEffect
+                                    }
+                                    val validIds = bookmarkedItems.map { it.id }.toSet()
+                                    selectedBookmarkIds = selectedBookmarkIds.intersect(validIds)
+                                }
+
+                                val sortedBookmarks by remember {
+                                    derivedStateOf {
+                                        bookmarkedItems.sortedByDescending { it.createdAt }
+                                    }
+                                }
+
                                 LazyColumn(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -1143,88 +1251,100 @@ fun ShinjikaiApp(
                                         .padding(horizontal = 16.dp, vertical = 10.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    items(bookmarkedItems, key = { it.id }) { item ->
-                                        val dismissState = rememberSwipeToDismissBoxState(
-                                            positionalThreshold = { totalDistance -> totalDistance * 0.45f },
-                                            confirmValueChange = { value ->
-                                                if (value == SwipeToDismissBoxValue.Settled) return@rememberSwipeToDismissBoxState false
-                                                pendingBookmarkDeletion = item
-                                                false
+                                    itemsIndexed(sortedBookmarks, key = { _, bookmark -> bookmark.id }) { index, bookmark ->
+                                        val item = bookmark.item
+                                        val thisDate = localDateOf(bookmark.createdAt)
+                                        val prevDate = sortedBookmarks
+                                            .getOrNull(index - 1)
+                                            ?.let { localDateOf(it.createdAt) }
+                                        val showHeader = prevDate == null || prevDate != thisDate
+
+                                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            if (showHeader) {
+                                                Text(
+                                                    text = thisDate.format(dateFormatter),
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                                                    modifier = Modifier.padding(start = 6.dp, top = 6.dp)
+                                                )
                                             }
-                                        )
-                                        SwipeToDismissBox(
-                                            state = dismissState,
-                                            enableDismissFromStartToEnd = false,
-                                            enableDismissFromEndToStart = true,
-                                            backgroundContent = {
-                                                Card(
-                                                    modifier = Modifier
-                                                        .fillMaxSize()
-                                                        .padding(vertical = 2.dp),
-                                                    shape = RoundedCornerShape(18.dp),
-                                                    colors = CardDefaults.cardColors(
-                                                        containerColor = MaterialTheme.colorScheme.errorContainer
-                                                    )
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier.fillMaxSize(),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.Delete,
-                                                            contentDescription = null,
-                                                            tint = MaterialTheme.colorScheme.onErrorContainer
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        ) {
+
+                                            val isSelected = selectedBookmarkIds.contains(bookmark.id)
+
                                             Card(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .clickable { openDetails(item) },
+                                                    .clickable {
+                                                        if (isBookmarkEditMode) {
+                                                            toggleSelection(bookmark.id)
+                                                        } else {
+                                                            openDetails(item)
+                                                        }
+                                                    },
                                                 shape = RoundedCornerShape(18.dp),
                                                 colors = CardDefaults.cardColors(
                                                     containerColor = MaterialTheme.colorScheme.surface
                                                 )
                                             ) {
-                                                Column(modifier = Modifier.padding(14.dp)) {
-                                                    Text(
-                                                        text = item.kana,
-                                                        style = MaterialTheme.typography.titleMedium,
-                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
-                                                    )
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
+                                                Row(
+                                                    modifier = Modifier.padding(14.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                ) {
+                                                    Column(modifier = Modifier.weight(1f)) {
                                                         Text(
-                                                            text = item.primaryWriting.ifBlank { item.kana },
-                                                            style = MaterialTheme.typography.headlineMedium,
-                                                            fontWeight = FontWeight.SemiBold,
-                                                            modifier = Modifier.weight(1f)
+                                                            text = item.kana,
+                                                            style = MaterialTheme.typography.titleMedium,
+                                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
                                                         )
-                                                        CommonnessBadge(difficulty = item.difficulty)
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(
+                                                                text = item.primaryWriting.ifBlank { item.kana },
+                                                                style = MaterialTheme.typography.headlineMedium,
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                modifier = Modifier.weight(1f)
+                                                            )
+                                                            CommonnessBadge(difficulty = item.difficulty)
+                                                        }
+                                                        Text(
+                                                            text = forceRtlText(
+                                                                if (useOfflineMode) {
+                                                                    formatOfflineSearchPreview(item.meaningSummary)
+                                                                } else {
+                                                                    item.meaningSummary
+                                                                }
+                                                            ),
+                                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                                textDirection = TextDirection.Rtl
+                                                            ),
+                                                            textAlign = TextAlign.Right,
+                                                            maxLines = if (useOfflineMode || activeCategoryId != null) 1 else Int.MAX_VALUE,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(top = 8.dp)
+                                                        )
+                                                        Text(
+                                                            text = "\u0623\u0636\u064a\u0641\u062a: ${localTimeLabel(bookmark.createdAt)}",
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                                            textAlign = TextAlign.Right,
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(top = 10.dp)
+                                                        )
                                                     }
-                                                    Text(
-                                                        text = forceRtlText(
-                                                            if (useOfflineMode) {
-                                                                formatOfflineSearchPreview(item.meaningSummary)
-                                                            } else {
-                                                                item.meaningSummary
-                                                            }
-                                                        ),
-                                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                                            textDirection = TextDirection.Rtl
-                                                        ),
-                                                        textAlign = TextAlign.Right,
-                                                        maxLines = if (useOfflineMode || activeCategoryId != null) 1 else Int.MAX_VALUE,
-                                                        overflow = TextOverflow.Ellipsis,
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .padding(top = 8.dp)
-                                                    )
+
+                                                    if (isBookmarkEditMode) {
+                                                        Checkbox(
+                                                            checked = isSelected,
+                                                            onCheckedChange = { toggleSelection(bookmark.id) }
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -1232,32 +1352,40 @@ fun ShinjikaiApp(
                                 }
                             }
 
-                            pendingBookmarkDeletion?.let { target ->
+                            pendingBookmarkDeletionIds?.let { ids ->
+                                val idsList = ids.toList()
+                                val isSingle = idsList.size == 1
+                                val label = if (isSingle) {
+                                    val firstId = idsList.first()
+                                    val target = bookmarkedItems.firstOrNull { it.id == firstId }?.item
+                                    (target?.primaryWriting ?: "").ifBlank {
+                                        (target?.kana ?: "").ifBlank { "ID $firstId" }
+                                    }
+                                } else {
+                                    "\u0633\u064a\u062a\u0645 \u062d\u0630\u0641 ${idsList.size} \u0643\u0644\u0645\u0627\u062a"
+                                }
+
                                 AlertDialog(
-                                    onDismissRequest = { pendingBookmarkDeletion = null },
+                                    onDismissRequest = { pendingBookmarkDeletionIds = null },
                                     title = { Text("\u062d\u0630\u0641 \u0645\u0646 \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0627\u062a\u061f") },
-                                    text = {
-                                        Text(
-                                            target.primaryWriting.ifBlank {
-                                                target.kana.ifBlank { "ID ${target.id}" }
-                                            }
-                                        )
-                                    },
+                                    text = { Text(label) },
                                     confirmButton = {
                                         TextButton(
                                             onClick = {
+                                                val toDelete = idsList
                                                 scope.launch {
-                                                    bookmarkRepository.deleteById(target.id)
-                                                    bookmarkedItems.removeAll { it.id == target.id }
+                                                    bookmarkRepository.deleteByIds(toDelete)
+                                                    bookmarkedItems.removeAll { it.id in toDelete }
                                                 }
-                                                pendingBookmarkDeletion = null
+                                                pendingBookmarkDeletionIds = null
+                                                selectedBookmarkIds = emptySet()
                                             }
                                         ) {
                                             Text("\u062d\u0630\u0641")
                                         }
                                     },
                                     dismissButton = {
-                                        TextButton(onClick = { pendingBookmarkDeletion = null }) {
+                                        TextButton(onClick = { pendingBookmarkDeletionIds = null }) {
                                             Text("\u0625\u0644\u063a\u0627\u0621")
                                         }
                                     }
@@ -1275,7 +1403,7 @@ fun ShinjikaiApp(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Text(appName)
+                                            Text("\u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a")
                                             ModeBadge(useOfflineMode = useOfflineMode)
                                         }
                                     },

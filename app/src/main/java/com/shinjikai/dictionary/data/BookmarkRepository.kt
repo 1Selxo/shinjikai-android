@@ -25,8 +25,8 @@ class BookmarkRepository(private val bookmarkDao: BookmarkDao) {
         return bookmarkDao.observeIds().map { it.toSet() }
     }
 
-    suspend fun getAll(): List<SearchItem> {
-        return bookmarkDao.getAll().map { entity -> entity.toSearchItem() }
+    suspend fun getAll(): List<BookmarkItem> {
+        return bookmarkDao.getAll().map { entity -> entity.toBookmarkItem() }
     }
 
     suspend fun upsert(item: SearchItem) {
@@ -44,12 +44,24 @@ class BookmarkRepository(private val bookmarkDao: BookmarkDao) {
         bookmarkDao.deleteById(id)
     }
 
+    suspend fun deleteByIds(ids: List<Int>) {
+        if (ids.isEmpty()) return
+        bookmarkDao.deleteByIds(ids)
+    }
+
     private fun BookmarkEntity.toSearchItem(): SearchItem {
         return SearchItem(
             id = id,
             kana = kana,
             writings = listOf(Writing(primaryWriting)),
             meaningSummary = meaningSummary
+        )
+    }
+
+    private fun BookmarkEntity.toBookmarkItem(): BookmarkItem {
+        return BookmarkItem(
+            item = toSearchItem(),
+            createdAt = createdAt
         )
     }
 }
