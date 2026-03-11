@@ -1,14 +1,15 @@
-package com.shinjikai.dictionary.data
+﻿package com.shinjikai.dictionary.data
 
-import android.util.Base64
 import okhttp3.Cache
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
+import java.io.IOException
 import java.util.Locale
-import kotlin.random.Random
+import java.util.concurrent.TimeUnit
 
 interface DictionarySource {
     suspend fun searchWords(term: String, page: Int = 0): Result<SearchWordsResponse>
@@ -18,7 +19,7 @@ interface DictionarySource {
 }
 
 class ShinjikaiRepository(
-    private val source: DictionarySource = RemoteDictionarySource()
+    private val source: DictionarySource = RemoteDictionarySource(clientId = "unknown")
 ) {
     suspend fun searchWords(term: String, page: Int = 0): Result<SearchWordsResponse> {
         return source.searchWords(term = term, page = page)
@@ -38,6 +39,7 @@ class ShinjikaiRepository(
 }
 
 class RemoteDictionarySource(
+    private val clientId: String = "unknown",
     private val cacheDir: File? = null
 ) : DictionarySource {
     private val api: ShinjikaiApi
@@ -53,8 +55,10 @@ class RemoteDictionarySource(
             return size > DETAILS_CACHE_LIMIT
         }
     }
+
     @Volatile
     private var categoriesCache: LoadCategoriesResponse? = null
+
     private val categoryMembersCacheLock = Any()
     private val categoryMembersCache = object : LinkedHashMap<String, LoadCategoryResponse>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, LoadCategoryResponse>?): Boolean {
@@ -63,9 +67,11 @@ class RemoteDictionarySource(
     }
 
     init {
-        val clientId = makeClientId()
-
         val clientBuilder = OkHttpClient.Builder()
+            .callTimeout(25, TimeUnit.SECONDS)
+            .connectTimeout(12, TimeUnit.SECONDS)
+            .readTimeout(22, TimeUnit.SECONDS)
+            .writeTimeout(22, TimeUnit.SECONDS)
             .addInterceptor(Interceptor { chain ->
                 val request = chain.request()
                     .newBuilder()
@@ -73,17 +79,16 @@ class RemoteDictionarySource(
                     .build()
                 chain.proceed(request)
             })
+
         cacheDir?.let { dir ->
             val httpCacheDir = File(dir, "shinjikai_http_cache")
             clientBuilder.cache(Cache(httpCacheDir, HTTP_CACHE_MAX_BYTES))
         }
 
-        val client = clientBuilder.build()
-
         val retrofit = Retrofit.Builder()
             .baseUrl("https://shinjikai.app/")
             .addConverterFactory(GsonConverterFactory.create())
-            .client(client)
+            .client(clientBuilder.build())
             .build()
 
         api = retrofit.create(ShinjikaiApi::class.java)
@@ -98,11 +103,13 @@ class RemoteDictionarySource(
 
         return runCatching {
             api.searchWords(SearchWordsRequest(term = term, page = page))
-        }.onSuccess { response ->
-            synchronized(searchCacheLock) {
-                searchCache[cacheKey] = response
-            }
         }
+            .mapFailure(::mapException)
+            .onSuccess { response ->
+                synchronized(searchCacheLock) {
+                    searchCache[cacheKey] = response
+                }
+            }
     }
 
     override suspend fun loadWordDetails(id: Int): Result<WordDetailsResponse> {
@@ -112,20 +119,24 @@ class RemoteDictionarySource(
 
         return runCatching {
             api.loadWordDetails(IdRequest(id = id))
-        }.onSuccess { response ->
-            synchronized(detailsCacheLock) {
-                detailsCache[id] = response
-            }
         }
+            .mapFailure(::mapException)
+            .onSuccess { response ->
+                synchronized(detailsCacheLock) {
+                    detailsCache[id] = response
+                }
+            }
     }
 
     override suspend fun loadCategories(): Result<LoadCategoriesResponse> {
         categoriesCache?.let { return Result.success(it) }
         return runCatching {
             api.loadCategories()
-        }.onSuccess { response ->
-            categoriesCache = response
         }
+            .mapFailure(::mapException)
+            .onSuccess { response ->
+                categoriesCache = response
+            }
     }
 
     override suspend fun loadCategory(id: Int, page: Int): Result<LoadCategoryResponse> {
@@ -136,17 +147,26 @@ class RemoteDictionarySource(
 
         return runCatching {
             api.loadCategory(CategoryRequest(id = id, page = page))
-        }.onSuccess { response ->
-            synchronized(categoryMembersCacheLock) {
-                categoryMembersCache[cacheKey] = response
+        }
+            .mapFailure(::mapException)
+            .onSuccess { response ->
+                synchronized(categoryMembersCacheLock) {
+                    categoryMembersCache[cacheKey] = response
+                }
             }
+    }
+
+    private fun mapException(t: Throwable): Throwable {
+        return when (t) {
+            is HttpException -> IOException("Server error (HTTP ${t.code()}). Please try again.", t)
+            is IOException -> IOException("Network error. Check your connection and try again.", t)
+            else -> t
         }
     }
 
-    private fun makeClientId(): String {
-        val bytes = ByteArray(8)
-        Random.nextBytes(bytes)
-        return Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+    private fun <T> Result<T>.mapFailure(mapper: (Throwable) -> Throwable): Result<T> {
+        val failure = exceptionOrNull() ?: return this
+        return Result.failure(mapper(failure))
     }
 
     private companion object {
@@ -156,7 +176,3 @@ class RemoteDictionarySource(
         const val HTTP_CACHE_MAX_BYTES = 40L * 1024L * 1024L
     }
 }
-
-
-
-

@@ -1,4 +1,4 @@
-package com.shinjikai.dictionary.data
+﻿package com.shinjikai.dictionary.data
 
 import androidx.room.withTransaction
 import com.google.gson.JsonArray
@@ -24,11 +24,16 @@ class YomitanImporter(
                 val allEntries = parseYomitanZip(zipStream, sourceLabel)
                 coroutineContext.ensureActive()
                 database.withTransaction {
+                    // Keep the FTS table in sync with the base table.
+                    yomitanDao.clearTermsFts()
                     yomitanDao.clearTerms()
+
                     allEntries.chunked(800).forEach { chunk ->
                         coroutineContext.ensureActive()
                         yomitanDao.upsertAll(chunk)
+                        yomitanDao.upsertAllFts(chunk.map { it.toFts() })
                     }
+
                     yomitanDao.upsertMeta(
                         YomitanMetaEntity(
                             key = "last_import_source",
@@ -146,5 +151,14 @@ class YomitanImporter(
 
     private fun JsonArray.getOrNull(index: Int): JsonElement? {
         return if (index in 0 until size()) get(index) else null
+    }
+
+    private fun YomitanTermEntity.toFts(): YomitanTermFtsEntity {
+        return YomitanTermFtsEntity(
+            rowId = id,
+            expression = expression,
+            reading = reading,
+            glossary = glossary
+        )
     }
 }

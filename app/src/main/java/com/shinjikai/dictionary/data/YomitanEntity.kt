@@ -1,6 +1,8 @@
-package com.shinjikai.dictionary.data
+﻿package com.shinjikai.dictionary.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Fts4
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -18,6 +20,17 @@ data class YomitanTermEntity(
     val glossary: String,
     val note: String = "",
     val source: String = "yomitan"
+)
+
+@Fts4
+@Entity(tableName = "yomitan_terms_fts")
+data class YomitanTermFtsEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "rowid")
+    val rowId: Int,
+    val expression: String,
+    val reading: String,
+    val glossary: String
 )
 
 @Entity(tableName = "yomitan_meta")

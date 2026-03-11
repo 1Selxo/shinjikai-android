@@ -1,4 +1,4 @@
-package com.shinjikai.dictionary.data
+﻿package com.shinjikai.dictionary.data
 
 import android.content.Context
 import androidx.room.Database
@@ -8,8 +8,13 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [BookmarkEntity::class, YomitanTermEntity::class, YomitanMetaEntity::class],
-    version = 2,
+    entities = [
+        BookmarkEntity::class,
+        YomitanTermEntity::class,
+        YomitanTermFtsEntity::class,
+        YomitanMetaEntity::class
+    ],
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -48,6 +53,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE VIRTUAL TABLE IF NOT EXISTS yomitan_terms_fts USING fts4(expression, reading, glossary)"
+                )
+                // Backfill from existing imported terms (if any).
+                db.execSQL(
+                    """
+                    INSERT INTO yomitan_terms_fts(rowid, expression, reading, glossary)
+                    SELECT id, expression, reading, glossary
+                    FROM yomitan_terms
+                    """.trimIndent()
+                )
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -58,7 +79,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "shinjikai.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { INSTANCE = it }
             }

@@ -1,4 +1,4 @@
-package com.shinjikai.dictionary.data
+﻿package com.shinjikai.dictionary.data
 
 class LocalYomitanSource(
     private val yomitanDao: YomitanDao
@@ -16,14 +16,28 @@ class LocalYomitanSource(
                 )
             )
         }
+
         return runCatching {
             val rows = if (isArabicQuery(query)) {
                 val normalizedQuery = normalizeArabic(query)
                 val tokens = normalizedQuery.split(' ').filter { it.isNotBlank() }
-                yomitanDao.searchArabic(
-                    term = query,
-                    normalizedTerm = normalizedQuery
-                )
+
+                val ftsCandidates = buildGlossaryOnlyFtsQuery(query)
+                    ?.let { ftsQuery ->
+                        yomitanDao.searchGlossaryFts(ftsQuery, limit = 2500)
+                    }
+                    .orEmpty()
+
+                val baseRows = if (ftsCandidates.isNotEmpty()) {
+                    ftsCandidates
+                } else {
+                    yomitanDao.searchArabic(
+                        term = query,
+                        normalizedTerm = normalizedQuery
+                    )
+                }
+
+                baseRows
                     .asSequence()
                     .map { row ->
                         val normalizedGlossary = normalizeArabic(row.glossary)
@@ -49,12 +63,24 @@ class LocalYomitanSource(
                     .take(80)
                     .toList()
             } else {
-                yomitanDao.search(
-                    term = query,
-                    prefix = "$query%"
-                ).distinctBy { row ->
-                    "${row.expression}\u0000${row.reading}\u0000${row.glossary}"
+                val ftsQuery = buildGenericFtsQuery(query)
+                val ftsRows = ftsQuery?.let { matchQuery ->
+                    yomitanDao.searchFts(matchQuery, limit = 250)
+                }.orEmpty()
+
+                val baseRows = if (ftsRows.isNotEmpty()) {
+                    ftsRows.sortedWith(compareBy<YomitanTermEntity> { rankJapaneseQuery(query, it) }
+                        .thenBy { it.id })
+                } else {
+                    yomitanDao.search(
+                        term = query,
+                        prefix = "${query}%"
+                    )
                 }
+
+                baseRows.distinctBy { row ->
+                    "${row.expression}\u0000${row.reading}\u0000${row.glossary}"
+                }.take(80)
             }
 
             SearchWordsResponse(
@@ -117,7 +143,7 @@ class LocalYomitanSource(
 
     private fun cleanGlossary(glossary: String): String {
         return glossary
-            .replace(Regex("""(?m)^\s*[🔹▪•●◦]\s*"""), "")
+            .replace(Regex("""(?m)^\s*[ðŸ”¹â–ªâ€¢â—â—¦]\s*"""), "")
             .trim()
     }
 
@@ -129,12 +155,12 @@ class LocalYomitanSource(
         if (text.isBlank()) return ""
         return text
             .replace(Regex("""[\u064B-\u065F\u0670\u06D6-\u06ED]"""), "")
-            .replace("ـ", "")
-            .replace(Regex("""[أإآٱ]"""), "ا")
-            .replace("ى", "ي")
-            .replace("ؤ", "و")
-            .replace("ئ", "ي")
-            .replace("ة", "ه")
+            .replace("Ù€", "")
+            .replace(Regex("""[Ø£Ø¥Ø¢Ù±]"""), "Ø§")
+            .replace("Ù‰", "ÙŠ")
+            .replace("Ø¤", "Ùˆ")
+            .replace("Ø¦", "ÙŠ")
+            .replace("Ø©", "Ù‡")
             .replace(Regex("""[^\p{L}\p{N}\s]"""), " ")
             .replace(Regex("""\s{2,}"""), " ")
             .trim()
@@ -157,5 +183,49 @@ class LocalYomitanSource(
         // Prefer earlier occurrences for partial matches.
         val index = glossary.indexOf(query)
         return if (index >= 0) 100 + index else Int.MAX_VALUE
+    }
+
+    private fun rankJapaneseQuery(query: String, row: YomitanTermEntity): Int {
+        val q = query.trim()
+        if (q.isBlank()) return Int.MAX_VALUE
+        return when {
+            row.expression == q -> 0
+            row.reading == q -> 1
+            row.expression.startsWith(q) -> 2
+            row.reading.startsWith(q) -> 3
+            else -> 4
+        }
+    }
+
+    private fun buildGenericFtsQuery(rawQuery: String): String? {
+        val tokens = rawQuery.trim()
+            .split(Regex("""\s+"""))
+            .mapNotNull { token -> sanitizeFtsToken(token)?.let { "$it*" } }
+            .distinct()
+
+        if (tokens.isEmpty()) return null
+        return tokens.joinToString(separator = " AND ")
+    }
+
+    private fun buildGlossaryOnlyFtsQuery(rawQuery: String): String? {
+        val tokens = rawQuery.trim()
+            .split(Regex("""\s+"""))
+            .mapNotNull { token -> sanitizeFtsToken(token)?.let { "glossary:$it*" } }
+            .distinct()
+
+        if (tokens.isEmpty()) return null
+        return tokens.joinToString(separator = " AND ")
+    }
+
+    private fun sanitizeFtsToken(raw: String): String? {
+        val trimmed = raw.trim().trim('"', '\'', '`')
+        if (trimmed.isBlank()) return null
+
+        // FTS query syntax is picky; keep it simple by stripping common operators.
+        val cleaned = trimmed
+            .replace(Regex("""[\*\^:\(\)\[\]{}!\\|&<>~]"""), "")
+            .trim()
+
+        return cleaned.takeIf { it.isNotBlank() }
     }
 }
