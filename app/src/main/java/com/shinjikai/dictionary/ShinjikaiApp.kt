@@ -2251,9 +2251,10 @@ private fun ExamplesCard(
                                     ),
                                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                                     textAlign = TextAlign.Start,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    overflow = TextOverflow.Ellipsis,
+                                    // Allow long Japanese examples to wrap to multiple lines.
+                                    maxLines = Int.MAX_VALUE,
+                                    softWrap = true,
+                                    overflow = TextOverflow.Clip,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                                 )
                             }
