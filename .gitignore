@@ -3,6 +3,7 @@
 build/
 **/build/
 captures/
+.gradle-user-home/
 
 # Local SDK config
 local.properties

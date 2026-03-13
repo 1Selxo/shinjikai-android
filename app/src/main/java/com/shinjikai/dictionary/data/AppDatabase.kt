@@ -12,9 +12,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BookmarkEntity::class,
         YomitanTermEntity::class,
         YomitanTermFtsEntity::class,
-        YomitanMetaEntity::class
+    YomitanMetaEntity::class
     ],
-    version = 3,
+    // Keep this >= the highest version that has ever shipped, otherwise existing installs may crash on downgrade.
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -69,6 +70,103 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // No schema changes; bump only to avoid crashing users that already have a v4 database.
+            }
+        }
+
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // We don't have the exact v4 schema in git history (it likely came from a local build),
+                // so be defensive:
+                // - Try to preserve bookmarks by copying whatever columns exist into a backup table.
+                // - Recreate dictionary tables to match current entities (offline data can be re-imported).
+                val nowEpochMsExpr = "(CAST(strftime('%s','now') AS INTEGER) * 1000)"
+
+                val hasBookmarks = tableExists(db, "bookmarks")
+                var canRestoreBookmarks = false
+                var bookmarkBackupCols: Set<String> = emptySet()
+
+                if (hasBookmarks) {
+                    // Backup the entire table as-is, regardless of its schema.
+                    db.execSQL("DROP TABLE IF EXISTS bookmarks_backup")
+                    db.execSQL("CREATE TABLE bookmarks_backup AS SELECT * FROM bookmarks")
+                    bookmarkBackupCols = getTableColumns(db, "bookmarks_backup")
+                    canRestoreBookmarks = "id" in bookmarkBackupCols
+                }
+
+                // Drop any existing tables we will recreate. Use IF EXISTS to tolerate unknown v4 schemas.
+                db.execSQL("DROP TABLE IF EXISTS yomitan_terms_fts")
+                db.execSQL("DROP TABLE IF EXISTS yomitan_terms")
+                db.execSQL("DROP TABLE IF EXISTS yomitan_meta")
+                db.execSQL("DROP TABLE IF EXISTS bookmarks")
+
+                // Recreate schema expected by the current entities.
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS bookmarks (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        primaryWriting TEXT NOT NULL,
+                        kana TEXT NOT NULL,
+                        meaningSummary TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS yomitan_terms (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        expression TEXT NOT NULL,
+                        reading TEXT NOT NULL,
+                        glossary TEXT NOT NULL,
+                        note TEXT NOT NULL,
+                        source TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_yomitan_terms_expression ON yomitan_terms(expression)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_yomitan_terms_reading ON yomitan_terms(reading)"
+                )
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS yomitan_meta (
+                        key TEXT NOT NULL PRIMARY KEY,
+                        value TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+
+                db.execSQL(
+                    "CREATE VIRTUAL TABLE IF NOT EXISTS yomitan_terms_fts USING fts4(expression, reading, glossary)"
+                )
+
+                // Restore bookmarks if we managed to back them up.
+                if (canRestoreBookmarks) {
+                    val selectPrimary = if ("primaryWriting" in bookmarkBackupCols) "primaryWriting" else "''"
+                    val selectKana = if ("kana" in bookmarkBackupCols) "kana" else "''"
+                    val selectMeaning = if ("meaningSummary" in bookmarkBackupCols) "meaningSummary" else "''"
+                    val selectCreatedAt = if ("createdAt" in bookmarkBackupCols) "createdAt" else nowEpochMsExpr
+
+                    db.execSQL(
+                        """
+                        INSERT OR REPLACE INTO bookmarks(id, primaryWriting, kana, meaningSummary, createdAt)
+                        SELECT id, $selectPrimary, $selectKana, $selectMeaning, $selectCreatedAt
+                        FROM bookmarks_backup
+                        """.trimIndent()
+                    )
+                }
+
+                db.execSQL("DROP TABLE IF EXISTS bookmarks_backup")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -79,10 +177,29 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "shinjikai.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                     .also { INSTANCE = it }
             }
+        }
+
+        private fun tableExists(db: SupportSQLiteDatabase, table: String): Boolean {
+            db.query("SELECT name FROM sqlite_master WHERE type='table' AND name='$table'").use { cursor ->
+                return cursor.moveToFirst()
+            }
+        }
+
+        private fun getTableColumns(db: SupportSQLiteDatabase, table: String): Set<String> {
+            val result = LinkedHashSet<String>()
+            db.query("PRAGMA table_info(`$table`)").use { cursor ->
+                val nameIndex = cursor.getColumnIndex("name")
+                while (cursor.moveToNext()) {
+                    if (nameIndex >= 0) {
+                        cursor.getString(nameIndex)?.let(result::add)
+                    }
+                }
+            }
+            return result
         }
     }
 }

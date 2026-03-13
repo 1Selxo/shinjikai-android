@@ -161,7 +161,8 @@ fun ShinjikaiApp(
     val importClient = remember { OkHttpClient() }
     val yomitanImporter = remember(database) { YomitanImporter(database) }
     val settingsStore = remember(context) { SettingsStore(context) }
-    val settings by settingsStore.settingsFlow.collectAsState(initial = AppSettings())
+    val initialSettings = remember(context) { settingsStore.readCached() }
+    val settings by settingsStore.settingsFlow.collectAsState(initial = initialSettings)
     val useOfflineMode = settings.useOfflineMode
     val isDarkMode = settings.darkMode
     val useDynamicColor = settings.useDynamicColor
@@ -237,18 +238,19 @@ fun ShinjikaiApp(
 
     DisposableEffect(context) {
         var disposed = false
-        var ttsInstance: TextToSpeech? = null
+        var tts: TextToSpeech? = null
         val instance = TextToSpeech(context) { status ->
             if (disposed) return@TextToSpeech
+            val ready = tts ?: return@TextToSpeech
             if (status == TextToSpeech.SUCCESS) {
-                val result = ttsInstance?.setLanguage(Locale.JAPANESE) ?: TextToSpeech.LANG_NOT_SUPPORTED
+                val result = ready.setLanguage(Locale.JAPANESE)
                 canSpeakJapanese = result != TextToSpeech.LANG_MISSING_DATA &&
                     result != TextToSpeech.LANG_NOT_SUPPORTED
             } else {
                 canSpeakJapanese = false
             }
         }
-        ttsInstance = instance
+        tts = instance
         val initResult = instance.setLanguage(Locale.JAPANESE)
         canSpeakJapanese = initResult != TextToSpeech.LANG_MISSING_DATA && initResult != TextToSpeech.LANG_NOT_SUPPORTED
 
@@ -604,51 +606,52 @@ fun ShinjikaiApp(
             }
 
             Surface(color = MaterialTheme.colorScheme.background) {
-                when (currentScreen) {
-                    Screen.Search -> {
-                        Scaffold(
-                            topBar = {
-                                TopAppBar(
-                                    title = {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Text(appName)
-                                            ModeBadge(useOfflineMode = useOfflineMode)
-                                        }
-                                    },
-                                    actions = {
-                                        IconButton(onClick = { navigateTo(Screen.Bookmarks) }) {
-                                            Icon(
-                                                imageVector = Icons.Default.Bookmark,
-                                                contentDescription = "\u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0627\u062a"
-                                            )
-                                        }
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when (currentScreen) {
+                        Screen.Search -> {
+                            Scaffold(
+                                topBar = {
+                                    TopAppBar(
+                                        title = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Text(appName)
+                                                ModeBadge(useOfflineMode = useOfflineMode)
+                                            }
+                                        },
+                                        actions = {
+                                            IconButton(onClick = { navigateTo(Screen.Bookmarks) }) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Bookmark,
+                                                    contentDescription = "\u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0627\u062a"
+                                                )
+                                            }
 
-                                        IconButton(onClick = { navigateTo(Screen.Settings) }) {
-                                            Icon(
-                                                imageVector = Icons.Default.Settings,
-                                                contentDescription = "\u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a"
-                                            )
+                                            IconButton(onClick = { navigateTo(Screen.Settings) }) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Settings,
+                                                    contentDescription = "\u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a"
+                                                )
+                                            }
                                         }
-                                    }
-                                )
-                            }
-                        ) { padding ->
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(padding)
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                if (activeCategoryName != null) {
-                                    CategorySearchBanner(
-                                        label = activeCategoryName.orEmpty(),
-                                        onClear = clearCategorySearch
                                     )
-                                } else {
+                                }
+                            ) { padding ->
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(padding)
+                                        .padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    if (activeCategoryName != null) {
+                                        CategorySearchBanner(
+                                            label = activeCategoryName.orEmpty(),
+                                            onClear = clearCategorySearch
+                                        )
+                                    } else {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1599,15 +1602,18 @@ fun ShinjikaiApp(
                                             contentDescription = "Open GitHub"
                                         )
                                     }
+                                    }
                                 }
                             }
                         }
                     }
+
                 }
             }
         }
     }
 }
+
 @Composable
 private fun DetailLoadingSkeleton() {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
