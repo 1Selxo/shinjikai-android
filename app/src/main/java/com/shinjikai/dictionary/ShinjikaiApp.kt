@@ -15,11 +15,14 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -102,6 +105,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Typography
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import com.shinjikai.dictionary.data.Meaning
 import com.shinjikai.dictionary.data.RelatedWordItem
 import com.shinjikai.dictionary.data.SearchItem
@@ -118,6 +125,7 @@ import kotlinx.coroutines.launch
 import android.widget.Toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.layout.ContentScale
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.text.DateFormat
@@ -1067,6 +1075,19 @@ fun ShinjikaiApp(
                                     definition = definitionChunk
                                 )
 
+                                val pictureUrls = details?.word?.meanings
+                                    .orEmpty()
+                                    .flatMap(::extractMeaningPictureUrls)
+                                    .mapNotNull(::normalizeApiImageUrl)
+                                    .distinct()
+
+                                if (pictureUrls.isNotEmpty()) {
+                                    PicturesCard(
+                                        title = "\u0627\u0644\u0635\u0648\u0631",
+                                        imageUrls = pictureUrls
+                                    )
+                                }
+
                                 val relatedFromWebsite = details?.similarWords
                                     .orEmpty()
                                     .map { relatedWord ->
@@ -1778,6 +1799,87 @@ private fun buildDefinitionWithWordIdLinks(
     }
 }
 
+private fun normalizeApiImageUrl(raw: String): String? {
+    val trimmed = raw.trim()
+    if (trimmed.isBlank()) return null
+
+    return when {
+        trimmed.startsWith("http://", ignoreCase = true) -> trimmed
+        trimmed.startsWith("https://", ignoreCase = true) -> trimmed
+        trimmed.startsWith("//") -> "https:$trimmed"
+        trimmed.startsWith("/") -> "https://shinjikai.app$trimmed"
+        else -> "https://shinjikai.app/$trimmed"
+    }
+}
+
+private fun extractMeaningPictureUrls(meaning: Meaning): List<String> {
+    return meaning.pictures.mapNotNull(::extractApiPictureUrl)
+}
+
+private fun extractApiPictureUrl(element: JsonElement): String? {
+    return when {
+        element.isJsonNull -> null
+        element.isJsonPrimitive -> element.asJsonPrimitive.takeIf { it.isString }?.asString
+        element.isJsonObject -> extractApiPictureUrlFromObject(element.asJsonObject)
+        else -> null
+    }
+}
+
+private fun extractApiPictureUrlFromObject(obj: JsonObject): String? {
+    // Try common field names first.
+    val directKeys = listOf(
+        // Observed on shinjikai.app website bundles: { Filename: "4825.jpg", ... }
+        "Filename",
+        "FileName",
+        "filename",
+        "fileName",
+        "Url",
+        "URL",
+        "url",
+        "Src",
+        "SRC",
+        "src",
+        "Path",
+        "path",
+        "ImageUrl",
+        "ImageURL",
+        "ThumbUrl",
+        "ThumbURL",
+        "thumbUrl",
+        "thumbURL"
+    )
+    for (key in directKeys) {
+        val value = obj.get(key) ?: continue
+        val asString = value.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString
+        if (asString.isNullOrBlank()) continue
+
+        // If we were given a filename, mirror the website convention.
+        if (key.equals("Filename", ignoreCase = true) || key.equals("FileName", ignoreCase = true)) {
+            val trimmed = asString.trim()
+            if (trimmed.isBlank()) continue
+            return if (trimmed.startsWith("/")) trimmed else "/static/word_pictures/$trimmed"
+        }
+
+        return asString
+    }
+
+    // Fallback: find the first string value that looks like a URL/path.
+    for ((_, value) in obj.entrySet()) {
+        val asString = value.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString ?: continue
+        val trimmed = asString.trim()
+        if (
+            trimmed.startsWith("http://", ignoreCase = true) ||
+            trimmed.startsWith("https://", ignoreCase = true) ||
+            trimmed.startsWith("//") ||
+            trimmed.startsWith("/")
+        ) {
+            return trimmed
+        }
+    }
+
+    return null
+}
+
 private fun forceRtlText(text: String): String = "\u202B$text\u202C"
 
 private fun normalizeExampleText(raw: String): String {
@@ -2115,6 +2217,91 @@ private fun DefinitionsCard(
                         modifier = Modifier.align(Alignment.End)
                     ) {
                         Text(if (expanded) "\u0639\u0631\u0636 \u0623\u0642\u0644" else "\u0639\u0631\u0636 \u0627\u0644\u0645\u0632\u064a\u062f")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PicturesCard(
+    title: String,
+    imageUrls: List<String>
+) {
+    val context = LocalContext.current
+    val visibleImages = remember(imageUrls) { imageUrls.filter { it.isNotBlank() }.distinct() }
+    if (visibleImages.isEmpty()) return
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+            )
+
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(
+                    12.dp,
+                    alignment = Alignment.CenterHorizontally
+                )
+            ) {
+                items(visibleImages) { url ->
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                        modifier = Modifier
+                            .size(width = 240.dp, height = 170.dp)
+                            .clickable {
+                                runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                }
+                            }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            SubcomposeAsyncImage(
+                                model = url,
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
+                                alignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                when (painter.state) {
+                                    is coil.compose.AsyncImagePainter.State.Loading -> {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                    }
+                                    is coil.compose.AsyncImagePainter.State.Error -> {
+                                        Text(
+                                            text = "\u062a\u0639\u0630\u0651\u0631 \u0627\u0644\u062a\u062d\u0645\u064a\u0644",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                                        )
+                                    }
+                                    else -> SubcomposeAsyncImageContent()
+                                }
+                            }
+                        }
                     }
                 }
             }

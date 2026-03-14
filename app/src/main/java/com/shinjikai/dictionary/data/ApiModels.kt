@@ -1,5 +1,6 @@
 package com.shinjikai.dictionary.data
 
+import com.google.gson.JsonElement
 import com.google.gson.annotations.SerializedName
 
 data class SearchWordsRequest(
@@ -67,7 +68,27 @@ data class WordRef(
 data class Meaning(
     @SerializedName("Arabic") val arabic: String = "",
     @SerializedName("Note") val note: String = "",
-    @SerializedName("Related") val related: List<RelatedGroup> = emptyList()
+    @SerializedName("Related") val related: List<RelatedGroup> = emptyList(),
+    // The API sometimes returns pictures as strings and sometimes as objects; keep it flexible to avoid breaking parsing.
+    // Example crash: "Expected a string but was BEGIN_OBJECT at $.Word.Meanings[0].Pictures[0]".
+    @SerializedName(
+        value = "Pictures",
+        alternate = [
+            "Images",
+            "ImageUrls",
+            "ImageURLs",
+            "ImageURLS",
+            "PictureUrls",
+            "PictureURLs",
+            "Media",
+            "MediaUrls",
+            "MediaURLs",
+            "GlossaryImages",
+            "GlossaryImageUrls",
+            "GlossaryImageURLs"
+        ]
+    )
+    val pictures: List<JsonElement> = emptyList()
 )
 
 data class CategoryRef(
