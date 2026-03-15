@@ -1,4 +1,4 @@
-﻿package com.shinjikai.dictionary
+package com.shinjikai.dictionary
 
 import android.content.Intent
 import android.net.Uri
@@ -74,13 +74,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
-import com.shinjikai.dictionary.data.AppSettings
-import com.shinjikai.dictionary.data.ClientIdStore
-import com.shinjikai.dictionary.data.SettingsStore
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -113,21 +108,8 @@ import com.shinjikai.dictionary.data.Meaning
 import com.shinjikai.dictionary.data.RelatedWordItem
 import com.shinjikai.dictionary.data.SearchItem
 import com.shinjikai.dictionary.data.SentenceExample
-import com.shinjikai.dictionary.data.ShinjikaiRepository
-import com.shinjikai.dictionary.data.WordDetailsResponse
-import com.shinjikai.dictionary.data.AppDatabase
-import com.shinjikai.dictionary.data.BookmarkRepository
-import com.shinjikai.dictionary.data.BookmarkItem
-import com.shinjikai.dictionary.data.LocalYomitanSource
-import com.shinjikai.dictionary.data.RemoteDictionarySource
-import com.shinjikai.dictionary.data.YomitanImporter
-import kotlinx.coroutines.launch
 import android.widget.Toast
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import androidx.compose.ui.layout.ContentScale
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.text.DateFormat
 import java.time.Instant
 import java.time.LocalDate
@@ -137,18 +119,10 @@ import java.time.format.FormatStyle
 import java.util.Date
 import java.util.Locale
 
-private enum class Screen {
-    Search,
-    Detail,
-    Bookmarks,
-    Settings
-}
-
-private enum class ResultMode {
-    None,
-    Search,
-    Category
-}
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.shinjikai.dictionary.ui.ResultMode
+import com.shinjikai.dictionary.ui.Screen
+import com.shinjikai.dictionary.ui.ShinjikaiViewModel
 
 private data class CategoryChipModel(
     val id: Int,
@@ -162,41 +136,22 @@ fun ShinjikaiApp(
     onExternalSearchTermConsumed: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val database = remember(context) { AppDatabase.getInstance(context) }
-    val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val clipboardManager = LocalClipboardManager.current
-    val importClient = remember { OkHttpClient() }
-    val yomitanImporter = remember(database) { YomitanImporter(database) }
-    val settingsStore = remember(context) { SettingsStore(context) }
-    val initialSettings = remember(context) { settingsStore.readCached() }
-    val settings by settingsStore.settingsFlow.collectAsState(initial = initialSettings)
+    val viewModel: ShinjikaiViewModel = viewModel()
+    val settings by viewModel.settings.collectAsState()
     val useOfflineMode = settings.useOfflineMode
     val isDarkMode = settings.darkMode
     val useDynamicColor = settings.useDynamicColor
-    val clientId = remember(context) { ClientIdStore.getOrCreate(context) }
 
     var textToSpeech by remember(context) { mutableStateOf<TextToSpeech?>(null) }
     var canSpeakJapanese by remember { mutableStateOf(false) }
-    var isImportingOfflineData by remember { mutableStateOf(false) }
-    var offlineImportProgress by remember { mutableStateOf(0f) }
-    var offlineImportPhase by remember { mutableStateOf<String?>(null) }
-    var offlineImportStatus by remember { mutableStateOf<String?>(null) }
-    var offlineLastImportEpochMs by remember { mutableStateOf<Long?>(null) }
-    var offlineTermCount by remember { mutableStateOf(0) }
-    val dictionarySource = remember(useOfflineMode, database, clientId) {
-        if (useOfflineMode) {
-            LocalYomitanSource(database.yomitanDao())
-        } else {
-            RemoteDictionarySource(clientId = clientId, cacheDir = context.cacheDir)
-        }
-    }
-    val repository = remember(dictionarySource) {
-        ShinjikaiRepository(source = dictionarySource)
-    }
-    val bookmarkRepository = remember {
-        BookmarkRepository(database.bookmarkDao())
-    }
+    val isImportingOfflineData = viewModel.isImportingOfflineData
+    val offlineImportProgress = viewModel.offlineImportProgress
+    val offlineImportPhase = viewModel.offlineImportPhase
+    val offlineImportStatus = viewModel.offlineImportStatus
+    val offlineLastImportEpochMs = viewModel.offlineLastImportEpochMs
+    val offlineTermCount = viewModel.offlineTermCount
     val appName = stringResource(id = R.string.app_name)
     val appVersionLabel = remember(context) {
         runCatching {
@@ -212,37 +167,29 @@ fun ShinjikaiApp(
     }
     val supportsDynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
-    var term by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(false) }
-    var loadingDetails by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var detailsError by remember { mutableStateOf<String?>(null) }
-    var results by remember { mutableStateOf(emptyList<SearchItem>()) }
-    var resultHeader by remember { mutableStateOf<String?>(null) }
-    var resultMode by remember { mutableStateOf(ResultMode.None) }
-    var activeResultQuery by remember { mutableStateOf("") }
-    var currentResultsPage by remember { mutableStateOf(0) }
-    var currentResultsPageCount by remember { mutableStateOf(0) }
-    var currentResultsTotalCount by remember { mutableStateOf(0) }
-    var loadingMore by remember { mutableStateOf(false) }
-    var details by remember { mutableStateOf<WordDetailsResponse?>(null) }
-    var selectedItem by remember { mutableStateOf<SearchItem?>(null) }
-    var currentScreen by remember { mutableStateOf(Screen.Search) }
-    val screenStack = remember { mutableStateListOf(Screen.Search) }
+    val term = viewModel.term
+    val loading = viewModel.loading
+    val loadingDetails = viewModel.loadingDetails
+    val error = viewModel.error
+    val detailsError = viewModel.detailsError
+    val results = viewModel.results
+    val resultHeader = viewModel.resultHeader
+    val resultMode = viewModel.resultMode
+    val activeResultQuery = viewModel.activeResultQuery
+    val currentResultsPage = viewModel.currentResultsPage
+    val currentResultsPageCount = viewModel.currentResultsPageCount
+    val currentResultsTotalCount = viewModel.currentResultsTotalCount
+    val loadingMore = viewModel.loadingMore
+    val details = viewModel.details
+    val selectedItem = viewModel.selectedItem
+    val currentScreen = viewModel.currentScreen
+    val screenStack = viewModel.screenStack
     var isSearchFieldFocused by remember { mutableStateOf(false) }
-    var isBookmarkEditMode by remember { mutableStateOf(false) }
-    var selectedBookmarkIds by remember { mutableStateOf(emptySet<Int>()) }
-    var pendingBookmarkDeletionIds by remember { mutableStateOf<Set<Int>?>(null) }
-    val bookmarkedItems = remember { mutableStateListOf<BookmarkItem>() }
-    val recentSearches = remember {
-        mutableStateListOf<String>().apply {
-            addAll(loadRecentSearches(context))
-        }
-    }
-    var categoryNameById by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
-    var activeCategoryId by remember { mutableStateOf<Int?>(null) }
-    var activeCategoryName by remember { mutableStateOf<String?>(null) }
-    var attemptedCategoryPreload by remember(dictionarySource) { mutableStateOf(false) }
+    val bookmarkedItems = viewModel.bookmarkedItems
+    val recentSearches = viewModel.recentSearches
+    val categoryNameById = viewModel.categoryNameById
+    val activeCategoryId = viewModel.activeCategoryId
+    val activeCategoryName = viewModel.activeCategoryName
 
     DisposableEffect(context) {
         var disposed = false
@@ -262,7 +209,7 @@ fun ShinjikaiApp(
         val initResult = instance.setLanguage(Locale.JAPANESE)
         canSpeakJapanese = initResult != TextToSpeech.LANG_MISSING_DATA && initResult != TextToSpeech.LANG_NOT_SUPPORTED
 
-                instance.setSpeechRate(0.92f)
+        instance.setSpeechRate(0.92f)
         instance.setPitch(1.0f)
         textToSpeech = instance
         onDispose {
@@ -274,37 +221,9 @@ fun ShinjikaiApp(
         }
     }
 
-    LaunchedEffect(Unit) {
-        bookmarkedItems.clear()
-        bookmarkedItems.addAll(bookmarkRepository.getAll())
-    }
-
-    val refreshOfflineTermCount: () -> Unit = {
-        scope.launch {
-            val (count, epochMs) = withContext(Dispatchers.IO) {
-                val dao = database.yomitanDao()
-                val count = dao.countTerms()
-                val epoch = dao.getMetaValue("last_import_epoch_ms")?.toLongOrNull()
-                count to epoch
-            }
-            offlineTermCount = count
-            offlineLastImportEpochMs = epochMs
-        }
-    }
-
     LaunchedEffect(currentScreen) {
         if (currentScreen == Screen.Settings) {
-            refreshOfflineTermCount()
-        }
-    }
-
-    LaunchedEffect(useOfflineMode, attemptedCategoryPreload) {
-        if (useOfflineMode || attemptedCategoryPreload) return@LaunchedEffect
-        attemptedCategoryPreload = true
-        repository.loadCategories().onSuccess { response ->
-            categoryNameById = response.categories
-                .associate { it.id to it.name.trim() }
-                .filterValues { it.isNotEmpty() }
+            viewModel.refreshOfflineTermCount()
         }
     }
 
@@ -354,235 +273,44 @@ fun ShinjikaiApp(
         else -> lightColors
     }
 
-    val runSearchForTerm: (String) -> Unit = { rawTerm ->
-        scope.launch {
-            error = null
-            activeCategoryId = null
-            activeCategoryName = null
-            resultHeader = null
-            val query = rawTerm.trim()
-            if (query.isBlank()) {
-                results = emptyList()
-                resultMode = ResultMode.None
-                activeResultQuery = ""
-                currentResultsPage = 0
-                currentResultsPageCount = 0
-                currentResultsTotalCount = 0
-                loadingMore = false
-                return@launch
-            }
-            rememberRecentSearch(context, recentSearches, query)
-            term = query
-            loading = true
-            loadingMore = false
-            val result = repository.searchWords(term = query, page = 0)
-            loading = false
-            result.onSuccess {
-                resultMode = ResultMode.Search
-                activeResultQuery = query
-                currentResultsPage = it.page
-                currentResultsPageCount = it.pageCount
-                currentResultsTotalCount = it.totalCount
-                results = it.items
-            }.onFailure {
-                results = emptyList()
-                error = it.message ?: "\\u0641\\u0634\\u0644 \\u0627\\u0644\\u0628\\u062d\\u062b"
-            }
-        }
+    val runSearchForTerm: (String) -> Unit = { rawTerm -> viewModel.runSearchForTerm(rawTerm) }
+    val runSearch: () -> Unit = {
+        focusManager.clearFocus()
+        viewModel.runSearch()
     }
-    val runSearch: () -> Unit = { runSearchForTerm(term) }
-
     val runCategorySearch: (Int, String) -> Unit = { categoryId, categoryName ->
-        scope.launch {
-            error = null
-            loading = true
-            loadingMore = false
-            activeCategoryId = categoryId
-            activeCategoryName = categoryName
-            resultHeader = null
-            term = categoryName
-            val result = repository.loadCategory(id = categoryId, page = 0)
-            loading = false
-            result.onSuccess { response ->
-                resultMode = ResultMode.Category
-                activeResultQuery = categoryName
-                currentResultsPage = response.members.page
-                currentResultsPageCount = response.members.pageCount
-                currentResultsTotalCount = response.members.totalCount
-                results = response.members.items
-            }.onFailure {
-                results = emptyList()
-                error = it.message ?: "\\u0641\\u0634\\u0644 \\u0627\\u0644\\u0628\\u062d\\u062b"
-            }
-        }
+        focusManager.clearFocus()
+        viewModel.runCategorySearch(categoryId, categoryName)
     }
-
-
     val clearCategorySearch: () -> Unit = {
-        activeCategoryId = null
-        activeCategoryName = null
-        resultHeader = null
-        resultMode = ResultMode.None
-        activeResultQuery = ""
-        currentResultsPage = 0
-        currentResultsPageCount = 0
-        currentResultsTotalCount = 0
-        loadingMore = false
-        term = ""
-        results = emptyList()
-        error = null
+        viewModel.clearCategorySearch()
         focusManager.clearFocus()
     }
     LaunchedEffect(externalSearchTerm) {
         val incoming = externalSearchTerm?.trim().orEmpty()
         if (incoming.isNotBlank()) {
-            currentScreen = Screen.Search
-            term = incoming
+            screenStack.clear()
+            screenStack.add(Screen.Search)
+            viewModel.currentScreen = Screen.Search
+            viewModel.term = incoming
             runSearchForTerm(incoming)
             onExternalSearchTermConsumed()
         }
     }
 
-    val canLoadMoreResults = !useOfflineMode && !loading && !loadingMore && currentResultsPage + 1 < currentResultsPageCount
-
-    val loadMoreResults: () -> Unit = {
-        if (canLoadMoreResults) {
-            val nextPage = currentResultsPage + 1
-            val categoryId = activeCategoryId
-            scope.launch {
-                error = null
-                loadingMore = true
-                val result: Result<com.shinjikai.dictionary.data.SearchWordsResponse> = when (resultMode) {
-                    ResultMode.Search -> repository.searchWords(term = activeResultQuery, page = nextPage)
-                    ResultMode.Category -> {
-                        if (categoryId == null) {
-                            Result.failure(IllegalStateException("No active category"))
-                        } else {
-                            repository.loadCategory(id = categoryId, page = nextPage).map { it.members }
-                        }
-                    }
-                    ResultMode.None -> Result.failure(IllegalStateException("No active results"))
-                }
-                loadingMore = false
-                result.onSuccess { response ->
-                    currentResultsPage = response.page
-                    currentResultsPageCount = response.pageCount
-                    currentResultsTotalCount = response.totalCount
-                    results = (results + response.items).distinctBy { it.id }
-                }.onFailure {
-                    error = it.message ?: "\\u0641\\u0634\\u0644 \\u0627\\u0644\\u0628\\u062d\\u062b"
-                }
-            }
-        }
-    }
-
-    val navigateTo: (Screen) -> Unit = { screen ->
-        screenStack.add(screen)
-        currentScreen = screen
-    }
-
-    val goBack: () -> Unit = {
-        if (screenStack.size > 1) {
-            screenStack.removeLast()
-            currentScreen = screenStack.last()
-            if (currentScreen != Screen.Detail) {
-                detailsError = null
-            }
-        }
-    }
-
+    val canLoadMoreResults = viewModel.canLoadMoreResults()
+    val loadMoreResults: () -> Unit = { viewModel.loadMoreResults() }
+    val navigateTo: (Screen) -> Unit = { screen -> viewModel.navigateTo(screen) }
+    val goBack: () -> Unit = { viewModel.goBack() }
     val openDetails: (SearchItem) -> Unit = { item ->
-        selectedItem = item
-        details = null
-        detailsError = null
-        loadingDetails = true
-        navigateTo(Screen.Detail)
-        scope.launch {
-            if (categoryNameById.isEmpty() && !useOfflineMode) {
-                repository.loadCategories().onSuccess { response ->
-                    categoryNameById = response.categories
-                        .associate { it.id to it.name.trim() }
-                        .filterValues { it.isNotEmpty() }
-                }
-            }
-            val result = repository.loadWordDetails(item.id)
-            loadingDetails = false
-            result.onSuccess { details = it }
-                .onFailure { detailsError = it.message ?: "\\u062a\\u0639\\u0630\\u0651\\u0631 \\u062a\\u062d\\u0645\\u064a\\u0644 \\u0627\\u0644\\u062a\\u0641\\u0627\\u0635\\u064a\\u0644" }
-        }
+        focusManager.clearFocus()
+        viewModel.openDetails(item)
     }
-
-    val openDetailsById: (Int) -> Unit = { id ->
-        openDetails(SearchItem(id = id))
-    }
-
     val openDetailsByRelatedItem: (RelatedWordItem) -> Unit = { relatedItem ->
-        if (relatedItem.wordId > 0) {
-            openDetailsById(relatedItem.wordId)
-        } else {
-            val lookupTerm = relatedItem.text.ifBlank { relatedItem.kana }.trim()
-            if (lookupTerm.isNotEmpty()) {
-                navigateTo(Screen.Search)
-                term = lookupTerm
-                focusManager.clearFocus()
-                runSearchForTerm(lookupTerm)
-            }
-        }
+        focusManager.clearFocus()
+        viewModel.openDetailsByRelatedItem(relatedItem)
     }
-
-    val importOfflineDictionary: () -> Unit = {
-        if (!isImportingOfflineData) {
-            scope.launch {
-                isImportingOfflineData = true
-                offlineImportStatus = null
-                offlineImportProgress = 0f
-                offlineImportPhase = "\u062c\u0627\u0631\u064a \u062a\u0646\u0632\u064a\u0644 \u0645\u0644\u0641 \u0627\u0644\u0642\u0627\u0645\u0648\u0633..."
-                val result = runCatching {
-                    withContext(Dispatchers.IO) {
-                        val request = Request.Builder()
-                            .url(OFFLINE_DICTIONARY_URL)
-                            .build()
-                        importClient.newCall(request).execute().use { response ->
-                            if (!response.isSuccessful) {
-                                error("HTTP ${response.code}")
-                            }
-                            val body = response.body ?: error("No response body")
-                            val totalBytes = body.contentLength().takeIf { it > 0L } ?: -1L
-                            val input = body.byteStream()
-                            val downloaded = java.io.ByteArrayOutputStream()
-                            val buffer = ByteArray(16 * 1024)
-                            var read = 0
-                            var copied = 0L
-                            while (input.read(buffer).also { read = it } >= 0) {
-                                downloaded.write(buffer, 0, read)
-                                copied += read
-                                if (totalBytes > 0L) {
-                                    val ratio = copied.toFloat() / totalBytes.toFloat()
-                                    offlineImportProgress = (ratio.coerceIn(0f, 1f) * 0.82f)
-                                }
-                            }
-                            offlineImportPhase = "\u062c\u0627\u0631\u064a \u0641\u0647\u0631\u0633\u0629 \u0627\u0644\u0642\u0627\u0645\u0648\u0633 \u0627\u0644\u0645\u062d\u0644\u064a..."
-                            offlineImportProgress = offlineImportProgress.coerceAtLeast(0.86f)
-                            val imported = yomitanImporter.importFromZip(
-                                zipStream = downloaded.toByteArray().inputStream(),
-                                sourceLabel = OFFLINE_DICTIONARY_SOURCE
-                            ).getOrThrow()
-                            offlineImportProgress = 1f
-                            imported
-                        }
-                    }
-                }
-                isImportingOfflineData = false
-                offlineImportPhase = null
-                result.onSuccess { importedCount ->
-                    offlineImportStatus = "\u062a\u0645 \u062a\u062d\u0645\u064a\u0644 $importedCount \u0643\u0644\u0645\u0629 \u0644\u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0628\u062f\u0648\u0646 \u0625\u0646\u062a\u0631\u0646\u062a."
-                    refreshOfflineTermCount()
-                }.onFailure { throwable ->
-                    offlineImportStatus = throwable.message ?: "\u0641\u0634\u0644 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0642\u0627\u0645\u0648\u0633 \u0627\u0644\u0645\u062d\u0644\u064a."
-                }
-            }
-        }
-    }
+    val importOfflineDictionary: () -> Unit = { viewModel.importOfflineDictionary() }
 
     val arabicFontFamily = FontFamily(Font(R.font.noto_sans_arabic))
     val baseTypography = Typography()
@@ -667,7 +395,7 @@ fun ShinjikaiApp(
                                     ) {
                                         OutlinedTextField(
                                             value = term,
-                                            onValueChange = { term = it },
+                                            onValueChange = { viewModel.term = it },
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .onFocusChanged { state ->
@@ -719,8 +447,7 @@ fun ShinjikaiApp(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .clickable {
-                                                        recentSearches.clear()
-                                                        saveRecentSearches(context, recentSearches)
+                                                        viewModel.clearRecentSearches()
                                                     }
                                                     .padding(horizontal = 12.dp, vertical = 10.dp),
                                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -743,7 +470,7 @@ fun ShinjikaiApp(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
                                                         .clickable {
-                                                            term = historyTerm
+                                                            viewModel.term = historyTerm
                                                             focusManager.clearFocus()
                                                             runSearch()
                                                         }
@@ -927,16 +654,7 @@ fun ShinjikaiApp(
                                         IconButton(
                                             onClick = {
                                                 item ?: return@IconButton
-                                                scope.launch {
-                                                    if (isBookmarked) {
-                                                        bookmarkRepository.deleteById(item.id)
-                                                        bookmarkedItems.removeAll { it.id == item.id }
-                                                    } else {
-                                                        bookmarkRepository.upsert(item)
-                                                        bookmarkedItems.removeAll { it.id == item.id }
-                                                        bookmarkedItems.add(0, BookmarkItem(item = item, createdAt = System.currentTimeMillis()))
-                                                    }
-                                                }
+                                                viewModel.toggleBookmark(item)
                                             }
                                         ) {
                                             Icon(
@@ -1153,8 +871,8 @@ fun ShinjikaiApp(
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             Text(
-                                                if (isBookmarkEditMode) {
-                                                    "${selectedBookmarkIds.size} \u0645\u062d\u062f\u062f"
+                                                if (viewModel.isBookmarkEditMode) {
+                                                    "${viewModel.selectedBookmarkIds.size} \u0645\u062d\u062f\u062f"
                                                 } else {
                                                     "\u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0627\u062a"
                                                 }
@@ -1171,13 +889,14 @@ fun ShinjikaiApp(
                                         }
                                     },
                                     actions = {
-                                        if (isBookmarkEditMode) {
+                                        if (viewModel.isBookmarkEditMode) {
                                             val allIds = bookmarkedItems.map { it.id }.toSet()
-                                            val isAllSelected = allIds.isNotEmpty() && selectedBookmarkIds.size == allIds.size
+                                            val isAllSelected = allIds.isNotEmpty() &&
+                                                viewModel.selectedBookmarkIds.size == allIds.size
 
                                             IconButton(
                                                 onClick = {
-                                                    selectedBookmarkIds = if (isAllSelected) emptySet() else allIds
+                                                    viewModel.selectedBookmarkIds = if (isAllSelected) emptySet() else allIds
                                                 }
                                             ) {
                                                 Icon(
@@ -1188,8 +907,8 @@ fun ShinjikaiApp(
 
                                             IconButton(
                                                 onClick = {
-                                                    if (selectedBookmarkIds.isNotEmpty()) {
-                                                        pendingBookmarkDeletionIds = selectedBookmarkIds
+                                                    if (viewModel.selectedBookmarkIds.isNotEmpty()) {
+                                                        viewModel.pendingBookmarkDeletionIds = viewModel.selectedBookmarkIds
                                                     }
                                                 }
                                             ) {
@@ -1201,8 +920,8 @@ fun ShinjikaiApp(
 
                                             IconButton(
                                                 onClick = {
-                                                    isBookmarkEditMode = false
-                                                    selectedBookmarkIds = emptySet()
+                                                    viewModel.isBookmarkEditMode = false
+                                                    viewModel.selectedBookmarkIds = emptySet()
                                                 }
                                             ) {
                                                 Icon(
@@ -1211,7 +930,7 @@ fun ShinjikaiApp(
                                                 )
                                             }
                                         } else {
-                                            IconButton(onClick = { isBookmarkEditMode = true }) {
+                                            IconButton(onClick = { viewModel.isBookmarkEditMode = true }) {
                                                 Icon(
                                                     imageVector = Icons.Default.Edit,
                                                     contentDescription = "\u0625\u062f\u0627\u0631\u0629"
@@ -1259,20 +978,20 @@ fun ShinjikaiApp(
                                 }
 
                                 fun toggleSelection(id: Int) {
-                                    selectedBookmarkIds = if (selectedBookmarkIds.contains(id)) {
-                                        selectedBookmarkIds - id
+                                    viewModel.selectedBookmarkIds = if (viewModel.selectedBookmarkIds.contains(id)) {
+                                        viewModel.selectedBookmarkIds - id
                                     } else {
-                                        selectedBookmarkIds + id
+                                        viewModel.selectedBookmarkIds + id
                                     }
                                 }
 
-                                LaunchedEffect(isBookmarkEditMode, bookmarkedItems.size) {
-                                    if (!isBookmarkEditMode) {
-                                        selectedBookmarkIds = emptySet()
+                                LaunchedEffect(viewModel.isBookmarkEditMode, bookmarkedItems.size) {
+                                    if (!viewModel.isBookmarkEditMode) {
+                                        viewModel.selectedBookmarkIds = emptySet()
                                         return@LaunchedEffect
                                     }
                                     val validIds = bookmarkedItems.map { it.id }.toSet()
-                                    selectedBookmarkIds = selectedBookmarkIds.intersect(validIds)
+                                    viewModel.selectedBookmarkIds = viewModel.selectedBookmarkIds.intersect(validIds)
                                 }
 
                                 val sortedBookmarks by remember {
@@ -1306,13 +1025,13 @@ fun ShinjikaiApp(
                                                 )
                                             }
 
-                                            val isSelected = selectedBookmarkIds.contains(bookmark.id)
+                                            val isSelected = viewModel.selectedBookmarkIds.contains(bookmark.id)
 
                                             Card(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .clickable {
-                                                        if (isBookmarkEditMode) {
+                                                        if (viewModel.isBookmarkEditMode) {
                                                             toggleSelection(bookmark.id)
                                                         } else {
                                                             openDetails(item)
@@ -1376,7 +1095,7 @@ fun ShinjikaiApp(
                                                         )
                                                     }
 
-                                                    if (isBookmarkEditMode) {
+                                                    if (viewModel.isBookmarkEditMode) {
                                                         Checkbox(
                                                             checked = isSelected,
                                                             onCheckedChange = { toggleSelection(bookmark.id) }
@@ -1389,7 +1108,7 @@ fun ShinjikaiApp(
                                 }
                             }
 
-                            pendingBookmarkDeletionIds?.let { ids ->
+                            viewModel.pendingBookmarkDeletionIds?.let { ids ->
                                 val idsList = ids.toList()
                                 val isSingle = idsList.size == 1
                                 val label = if (isSingle) {
@@ -1403,26 +1122,21 @@ fun ShinjikaiApp(
                                 }
 
                                 AlertDialog(
-                                    onDismissRequest = { pendingBookmarkDeletionIds = null },
+                                    onDismissRequest = { viewModel.pendingBookmarkDeletionIds = null },
                                     title = { Text("\u062d\u0630\u0641 \u0645\u0646 \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0627\u062a\u061f") },
                                     text = { Text(label) },
                                     confirmButton = {
                                         TextButton(
                                             onClick = {
                                                 val toDelete = idsList
-                                                scope.launch {
-                                                    bookmarkRepository.deleteByIds(toDelete)
-                                                    bookmarkedItems.removeAll { it.id in toDelete }
-                                                }
-                                                pendingBookmarkDeletionIds = null
-                                                selectedBookmarkIds = emptySet()
+                                                viewModel.deleteBookmarks(toDelete)
                                             }
                                         ) {
                                             Text("\u062d\u0630\u0641")
                                         }
                                     },
                                     dismissButton = {
-                                        TextButton(onClick = { pendingBookmarkDeletionIds = null }) {
+                                        TextButton(onClick = { viewModel.pendingBookmarkDeletionIds = null }) {
                                             Text("\u0625\u0644\u063a\u0627\u0621")
                                         }
                                     }
@@ -1496,7 +1210,7 @@ fun ShinjikaiApp(
                                             Text("\u0627\u0644\u0648\u0636\u0639 \u0627\u0644\u062f\u0627\u0643\u0646", style = MaterialTheme.typography.bodyLarge)
                                             Switch(
                                                 checked = isDarkMode,
-                                                onCheckedChange = { enabled -> scope.launch { settingsStore.setDarkMode(enabled) } }
+                                            onCheckedChange = { enabled -> viewModel.setDarkMode(enabled) }
                                             )
                                         }
 
@@ -1508,7 +1222,7 @@ fun ShinjikaiApp(
                                             Text("\u0627\u0644\u0623\u0644\u0648\u0627\u0646 \u0627\u0644\u062f\u064a\u0646\u0627\u0645\u064a\u0643\u064a\u0629", style = MaterialTheme.typography.bodyLarge)
                                             Switch(
                                                 checked = useDynamicColor && supportsDynamicColor,
-                                                onCheckedChange = { enabled -> scope.launch { settingsStore.setUseDynamicColor(enabled) } },
+                                            onCheckedChange = { enabled -> viewModel.setUseDynamicColor(enabled) },
                                                 enabled = supportsDynamicColor
                                             )
                                         }
@@ -1521,7 +1235,7 @@ fun ShinjikaiApp(
                                             Text("\u0648\u0636\u0639 \u0639\u062f\u0645 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \u0628\u0627\u0644\u0625\u0646\u062a\u0631\u0646\u062a", style = MaterialTheme.typography.bodyLarge)
                                             Switch(
                                                 checked = useOfflineMode,
-                                                onCheckedChange = { enabled -> scope.launch { settingsStore.setUseOfflineMode(enabled) } }
+                                            onCheckedChange = { enabled -> viewModel.setUseOfflineMode(enabled) }
                                             )
                                         }
                                     }
@@ -1716,87 +1430,40 @@ private fun formatDefinition(meanings: List<Meaning>?): String {
     return formatted.joinToString(separator = "\n\n").trim()
 }
 
+private val MEANING_BULLET_PREFIX_REGEX =
+    Regex("(?m)^\\s*[\\uD83D\\uDD39\\u25AA\\u2022\\u25CF\\u25E6]\\s*")
+private const val JAPANESE_WORD_PATTERN =
+    "[\\p{IsHan}\\p{IsHiragana}\\p{IsKatakana}\\u30FC\\u3005\\u3006\\u30F6]+"
+private val JAPANESE_WORD_WITH_ID_PREFIX_REGEX = Regex("""\d{3,}\s+($JAPANESE_WORD_PATTERN)""")
+private val JAPANESE_WORD_WITH_ID_SUFFIX_REGEX = Regex("""($JAPANESE_WORD_PATTERN)\s+\d{3,}""")
+private val MEANING_ABBREV_NO_REGEX = Regex(
+    "\\(?\\s*\u0627\u062e\u062a\u0635\u0627\u0631\\s*[:\uFF1A]\\s*no\\s*\\)?",
+    RegexOption.IGNORE_CASE
+)
+
+private val MEANING_EMPTY_BRACES_REGEX = Regex("""\{\s*\}""")
+private val MEANING_TRAILING_SPACES_REGEX = Regex("""(?m)^\s+$""")
+private val MEANING_MULTISPACE_REGEX = Regex("""[ \t]{2,}""")
 private fun normalizeMeaningText(raw: String): String {
-    if (raw.isBlank()) return ""
-    return raw
-        // Remove noisy glossary symbols copied from source formatting.
+    val trimmed = raw.trim()
+    if (trimmed.isBlank()) return ""
+
+    return trimmed
         .replace("$", "")
-        .replace(Regex("""(?m)^\s*[\uD83D\uDD39\u25AA\u2022\u25CF\u25E6]\s*"""), "")
-        .replace(Regex("""\(?\s*\u0627\u062e\u062a\u0635\u0627\u0631\s*[:\uFF1A]\s*no\s*\)?""", RegexOption.IGNORE_CASE), "")
-        // Remove numeric IDs attached to Japanese words: "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« 12345" or "12345 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â«".
-        .replace(
-            Regex("""([\p{IsHan}\p{IsHiragana}\p{IsKatakana}ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â»ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¤]+)\s+\d{3,}"""),
-            "$1"
-        )
-        .replace(
-            Regex("""\d{3,}\s+([\p{IsHan}\p{IsHiragana}\p{IsKatakana}ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â»ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¤]+)"""),
-            "$1"
-        )
-        // Drop leftover standalone glossary IDs while preserving normal short numbers.
-        .replace(Regex("""\b\d{4,}\b"""), "")
-        .replace(Regex("""\(\s*\)"""), "")
-        .replace(Regex("""\[\s*]"""), "")
-        .replace(Regex("""ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â»\s*ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â½"""), "")
-        .replace(Regex("""\{\s*\}"""), "")
-        .replace(Regex("""ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â \s*ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°"""), "")
-        .replace(Regex("""\s{2,}"""), " ")
-        .replace(Regex("""[ \t]+\n"""), "\n")
-        .replace(Regex("""\n{3,}"""), "\n\n")
+        .replace(MEANING_BULLET_PREFIX_REGEX, "")
+        .replace(MEANING_ABBREV_NO_REGEX, "")
+        .replace(JAPANESE_WORD_WITH_ID_PREFIX_REGEX, "$1")
+        .replace(JAPANESE_WORD_WITH_ID_SUFFIX_REGEX, "$1")
+        .replace(MEANING_EMPTY_BRACES_REGEX, "")
+        .replace(MEANING_TRAILING_SPACES_REGEX, "")
+        .replace(MEANING_MULTISPACE_REGEX, " ")
         .trim()
 }
-
 private fun normalizeMeaningNote(raw: String): String {
     val cleaned = normalizeMeaningText(raw)
     if (cleaned.equals("no", ignoreCase = true)) return ""
     if (cleaned.equals("-", ignoreCase = true)) return ""
     return cleaned
-}
-
-private fun buildDefinitionWithWordIdLinks(
-    definition: String,
-    linkColor: androidx.compose.ui.graphics.Color
-): AnnotatedString {
-    val linkedWordRegex = Regex(
-        """(\d{3,})\s+([\p{IsHan}\p{IsHiragana}\p{IsKatakana}ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â»ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¤]+)|([\p{IsHan}\p{IsHiragana}\p{IsKatakana}ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â»ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¤]+)\s+(\d{3,})"""
-    )
-    val standaloneIdRegex = Regex("""\b\d{3,}\b""")
-    fun cleanStandaloneIds(text: String): String {
-        return text
-            .replace(standaloneIdRegex, "")
-            .replace(Regex("[ \\t]{2,}"), " ")
-    }
-
-    return buildAnnotatedString {
-        append('\u202B') // RLE: force RTL embedding for mixed-script content.
-        var cursor = 0
-        for (match in linkedWordRegex.findAll(definition)) {
-            val start = match.range.first
-            val endExclusive = match.range.last + 1
-            if (start > cursor) append(cleanStandaloneIds(definition.substring(cursor, start)))
-
-            val idText = match.groups[1]?.value ?: match.groups[4]?.value
-            val wordText = match.groups[2]?.value ?: match.groups[3]?.value
-            if (idText == null || wordText == null) {
-                append(cleanStandaloneIds(match.value))
-                cursor = endExclusive
-                continue
-            }
-            pushStringAnnotation(tag = "word_id", annotation = idText)
-            withStyle(
-                SpanStyle(
-                    color = linkColor,
-                    textDecoration = TextDecoration.Underline,
-                    fontWeight = FontWeight.SemiBold
-                )
-            ) {
-                append(wordText)
-            }
-            pop()
-            cursor = endExclusive
-        }
-        if (cursor < definition.length) append(cleanStandaloneIds(definition.substring(cursor)))
-        append('\u202C') // PDF: end RTL embedding.
-    }
 }
 
 private fun normalizeApiImageUrl(raw: String): String? {
@@ -1952,51 +1619,13 @@ private fun formatOfflineSearchPreview(raw: String): String {
         .trim()
 }
 
-private fun rememberRecentSearch(
-    context: android.content.Context,
-    recentSearches: MutableList<String>,
-    term: String
-) {
-    recentSearches.removeAll { it.equals(term, ignoreCase = true) }
-    recentSearches.add(0, term)
-    while (recentSearches.size > MAX_RECENT_SEARCHES) {
-        recentSearches.removeAt(recentSearches.lastIndex)
-    }
-    saveRecentSearches(context, recentSearches)
-}
-
-private fun loadRecentSearches(context: android.content.Context): List<String> {
-    val prefs = context.getSharedPreferences(RECENT_SEARCH_PREFS_NAME, android.content.Context.MODE_PRIVATE)
-    val raw = prefs.getStringSet(RECENT_SEARCHES_KEY, emptySet()).orEmpty()
-    // Preserve deterministic order by sorting with stored numeric prefix.
-    return raw.mapNotNull { entry ->
-        val pivot = entry.indexOf('|')
-        if (pivot <= 0 || pivot >= entry.length - 1) return@mapNotNull null
-        val order = entry.substring(0, pivot).toIntOrNull() ?: return@mapNotNull null
-        order to entry.substring(pivot + 1)
-    }.sortedBy { it.first }
-        .map { it.second }
-}
-
-private fun saveRecentSearches(context: android.content.Context, items: List<String>) {
-    val prefs = context.getSharedPreferences(RECENT_SEARCH_PREFS_NAME, android.content.Context.MODE_PRIVATE)
-    val asSet = items.mapIndexed { index, value -> "$index|$value" }.toSet()
-    prefs.edit().putStringSet(RECENT_SEARCHES_KEY, asSet).apply()
-}
-
 private fun formatEpochAsLocal(epochMs: Long): String {
     return runCatching {
         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
             .format(Date(epochMs))
     }.getOrDefault("-")
 }
-private const val RECENT_SEARCH_PREFS_NAME = "shinjikai_recent_searches"
-private const val RECENT_SEARCHES_KEY = "recent_terms"
-private const val MAX_RECENT_SEARCHES = 15
 private const val RELATED_WORDS_PAGE_SIZE = 5
-private const val OFFLINE_DICTIONARY_SOURCE = "japanesearabic-yomitan-v2"
-private const val OFFLINE_DICTIONARY_URL =
-    "https://raw.githubusercontent.com/a-hamdi/japanesearabic/main/data/YomitandictionaryV2/%E6%B7%B1%E8%BE%9E%E6%B5%B7_No_Examples_No_%E4%BE%8B%E6%96%87%20-%20JP-AR%20STYLING%20FIX.zip"
 
 private data class MeaningEntry(
     val definition: String,

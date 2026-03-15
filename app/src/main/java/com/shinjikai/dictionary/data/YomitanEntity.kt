@@ -1,4 +1,4 @@
-﻿package com.shinjikai.dictionary.data
+package com.shinjikai.dictionary.data
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity

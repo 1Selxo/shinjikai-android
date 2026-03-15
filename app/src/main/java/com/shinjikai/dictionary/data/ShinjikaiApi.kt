@@ -1,4 +1,4 @@
-﻿package com.shinjikai.dictionary.data
+package com.shinjikai.dictionary.data
 
 import retrofit2.http.Body
 import retrofit2.http.POST

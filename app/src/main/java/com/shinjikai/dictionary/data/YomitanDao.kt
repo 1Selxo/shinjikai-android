@@ -1,4 +1,4 @@
-﻿package com.shinjikai.dictionary.data
+package com.shinjikai.dictionary.data
 
 import androidx.room.Dao
 import androidx.room.Insert
@@ -26,6 +26,26 @@ interface YomitanDao {
         """
     )
     suspend fun search(term: String, prefix: String, limit: Int = 80): List<YomitanTermEntity>
+
+    @Query(
+        """
+        SELECT * FROM yomitan_terms
+        WHERE expression LIKE '%' || :term || '%'
+            OR reading LIKE '%' || :term || '%'
+            OR glossary LIKE '%' || :term || '%'
+        ORDER BY
+            CASE
+                WHEN expression = :term THEN 0
+                WHEN reading = :term THEN 1
+                WHEN expression LIKE :prefix THEN 2
+                WHEN reading LIKE :prefix THEN 3
+                ELSE 4
+            END,
+            id ASC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    suspend fun searchPaged(term: String, prefix: String, limit: Int, offset: Int): List<YomitanTermEntity>
 
     @Query(
         """
@@ -63,6 +83,17 @@ interface YomitanDao {
         normalizedTerm: String,
         limit: Int = 2500
     ): List<YomitanTermEntity>
+
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM yomitan_terms
+        WHERE expression LIKE '%' || :term || '%'
+            OR reading LIKE '%' || :term || '%'
+            OR glossary LIKE '%' || :term || '%'
+        """
+    )
+    suspend fun countSearchMatches(term: String): Int
 
     @Query("SELECT * FROM yomitan_terms WHERE id = :id LIMIT 1")
     suspend fun getById(id: Int): YomitanTermEntity?

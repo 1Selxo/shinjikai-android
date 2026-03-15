@@ -1,4 +1,4 @@
-﻿package com.shinjikai.dictionary.data
+package com.shinjikai.dictionary.data
 
 import android.content.Context
 import androidx.room.Database

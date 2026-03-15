@@ -1,4 +1,10 @@
-﻿package com.shinjikai.dictionary.data
+package com.shinjikai.dictionary.data
+
+private val BULLET_PREFIX_REGEX = Regex("""(?m)^\s*[🔹▪•●◦]\s*""")
+private val MULTISPACE_REGEX = Regex("""\s{2,}""")
+private val ARABIC_DIACRITICS_REGEX = Regex("""[\u064B-\u065F\u0670\u06D6-\u06ED]""")
+private val ARABIC_ALEF_VARIANTS_REGEX = Regex("""[أإآٱ]""")
+private val NON_LETTER_NUMBER_SPACE_REGEX = Regex("""[^\p{L}\p{N}\s]""")
 
 class LocalYomitanSource(
     private val yomitanDao: YomitanDao
@@ -6,19 +12,19 @@ class LocalYomitanSource(
     override suspend fun searchWords(term: String, page: Int): Result<SearchWordsResponse> {
         val query = term.trim()
         if (query.isBlank()) return Result.success(SearchWordsResponse(items = emptyList()))
-        if (page > 0) {
-            return Result.success(
-                SearchWordsResponse(
-                    items = emptyList(),
-                    page = page,
-                    pageCount = 1,
-                    totalCount = 0
-                )
-            )
-        }
+        val pageIndex = page.coerceAtLeast(0)
+        val pageSize = 80
+        val offset = pageIndex * pageSize
 
         return runCatching {
-            val rows = if (isArabicQuery(query)) {
+            val isArabic = isArabicQuery(query)
+            val ftsQuery = if (!isArabic) buildGenericFtsQuery(query) else null
+
+            val allRows: List<YomitanTermEntity>
+            val pagedRowsDirect: List<YomitanTermEntity>?
+            val totalCountDirect: Int?
+
+            if (isArabic) {
                 val normalizedQuery = normalizeArabic(query)
                 val tokens = normalizedQuery.split(' ').filter { it.isNotBlank() }
 
@@ -37,7 +43,7 @@ class LocalYomitanSource(
                     )
                 }
 
-                baseRows
+                allRows = baseRows
                     .asSequence()
                     .map { row ->
                         val normalizedGlossary = normalizeArabic(row.glossary)
@@ -60,31 +66,46 @@ class LocalYomitanSource(
                     .distinctBy { row ->
                         "${row.expression}\u0000${row.reading}\u0000${row.glossary}"
                     }
-                    .take(80)
                     .toList()
-            } else {
-                val ftsQuery = buildGenericFtsQuery(query)
-                val ftsRows = ftsQuery?.let { matchQuery ->
-                    yomitanDao.searchFts(matchQuery, limit = 250)
-                }.orEmpty()
-
-                val baseRows = if (ftsRows.isNotEmpty()) {
-                    ftsRows.sortedWith(compareBy<YomitanTermEntity> { rankJapaneseQuery(query, it) }
-                        .thenBy { it.id })
-                } else {
-                    yomitanDao.search(
-                        term = query,
-                        prefix = "${query}%"
+                pagedRowsDirect = null
+                totalCountDirect = null
+            } else if (ftsQuery != null) {
+                val desiredCandidates = ((pageIndex + 1) * pageSize * 5).coerceAtLeast(250)
+                val ftsRows = yomitanDao.searchFts(
+                    matchQuery = ftsQuery,
+                    limit = desiredCandidates.coerceAtMost(2500)
+                )
+                allRows = ftsRows
+                    .sortedWith(
+                        compareBy<YomitanTermEntity> { rankJapaneseQuery(query, it) }
+                            .thenBy { it.id }
                     )
-                }
-
-                baseRows.distinctBy { row ->
+                    .distinctBy { row ->
+                        "${row.expression}\u0000${row.reading}\u0000${row.glossary}"
+                    }
+                    .toList()
+                pagedRowsDirect = null
+                totalCountDirect = null
+            } else {
+                // Fall back to a paged LIKE query. Use a separate COUNT so paging metadata stays correct.
+                pagedRowsDirect = yomitanDao.searchPaged(
+                    term = query,
+                    prefix = "${query}%",
+                    limit = pageSize,
+                    offset = offset
+                ).distinctBy { row ->
                     "${row.expression}\u0000${row.reading}\u0000${row.glossary}"
-                }.take(80)
+                }
+                totalCountDirect = yomitanDao.countSearchMatches(query)
+                allRows = emptyList()
             }
 
+            val totalCount = totalCountDirect ?: allRows.size
+            val pageCount = if (totalCount == 0) 0 else ((totalCount + pageSize - 1) / pageSize)
+            val pageRows = pagedRowsDirect ?: allRows.drop(offset).take(pageSize)
+
             SearchWordsResponse(
-                items = rows.map { row ->
+                items = pageRows.map { row ->
                     SearchItem(
                         id = row.id,
                         kana = row.reading,
@@ -93,9 +114,9 @@ class LocalYomitanSource(
                         jlpt = 0
                     )
                 },
-                page = 0,
-                pageCount = if (rows.isEmpty()) 0 else 1,
-                totalCount = rows.size
+                page = pageIndex,
+                pageCount = pageCount,
+                totalCount = totalCount
             )
         }
     }
@@ -137,13 +158,13 @@ class LocalYomitanSource(
     private fun buildSearchPreview(glossary: String): String {
         return cleanGlossary(glossary)
             .replace("\n", " ")
-            .replace(Regex("""\s{2,}"""), " ")
+            .replace(MULTISPACE_REGEX, " ")
             .trim()
     }
 
     private fun cleanGlossary(glossary: String): String {
         return glossary
-            .replace(Regex("""(?m)^\s*[ðŸ”¹â–ªâ€¢â—â—¦]\s*"""), "")
+            .replace(BULLET_PREFIX_REGEX, "")
             .trim()
     }
 
@@ -154,15 +175,15 @@ class LocalYomitanSource(
     private fun normalizeArabic(text: String): String {
         if (text.isBlank()) return ""
         return text
-            .replace(Regex("""[\u064B-\u065F\u0670\u06D6-\u06ED]"""), "")
-            .replace("Ù€", "")
-            .replace(Regex("""[Ø£Ø¥Ø¢Ù±]"""), "Ø§")
-            .replace("Ù‰", "ÙŠ")
-            .replace("Ø¤", "Ùˆ")
-            .replace("Ø¦", "ÙŠ")
-            .replace("Ø©", "Ù‡")
-            .replace(Regex("""[^\p{L}\p{N}\s]"""), " ")
-            .replace(Regex("""\s{2,}"""), " ")
+            .replace(ARABIC_DIACRITICS_REGEX, "")
+            .replace("ـ", "") // tatweel
+            .replace(ARABIC_ALEF_VARIANTS_REGEX, "ا")
+            .replace("ى", "ي")
+            .replace("ؤ", "و")
+            .replace("ئ", "ي")
+            .replace("ة", "ه")
+            .replace(NON_LETTER_NUMBER_SPACE_REGEX, " ")
+            .replace(MULTISPACE_REGEX, " ")
             .trim()
     }
 
