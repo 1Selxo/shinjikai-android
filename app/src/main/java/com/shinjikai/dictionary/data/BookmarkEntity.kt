@@ -9,5 +9,7 @@ data class BookmarkEntity(
     val primaryWriting: String,
     val kana: String,
     val meaningSummary: String,
+    val detailsJson: String? = null,
+    val detailsSavedAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
 )

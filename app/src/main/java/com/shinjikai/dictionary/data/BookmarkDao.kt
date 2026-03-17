@@ -21,6 +21,9 @@ interface BookmarkDao {
     @Query("SELECT id FROM bookmarks")
     fun observeIds(): Flow<List<Int>>
 
+    @Query("SELECT detailsJson FROM bookmarks WHERE id = :id LIMIT 1")
+    suspend fun getDetailsJsonById(id: Int): String?
+
     @Query("DELETE FROM bookmarks WHERE id = :id")
     suspend fun deleteById(id: Int)
 

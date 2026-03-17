@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     YomitanMetaEntity::class
     ],
     // Keep this >= the highest version that has ever shipped, otherwise existing installs may crash on downgrade.
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -167,6 +167,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                if (!tableExists(db, "bookmarks")) return
+                val cols = getTableColumns(db, "bookmarks")
+                if ("detailsJson" !in cols) {
+                    db.execSQL("ALTER TABLE bookmarks ADD COLUMN detailsJson TEXT")
+                }
+                if ("detailsSavedAt" !in cols) {
+                    db.execSQL("ALTER TABLE bookmarks ADD COLUMN detailsSavedAt INTEGER")
+                }
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -177,7 +190,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "shinjikai.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                     .also { INSTANCE = it }
             }

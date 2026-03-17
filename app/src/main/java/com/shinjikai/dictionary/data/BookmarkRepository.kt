@@ -4,10 +4,14 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
+import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class BookmarkRepository(private val bookmarkDao: BookmarkDao) {
+class BookmarkRepository(
+    private val bookmarkDao: BookmarkDao,
+    private val gson: Gson = Gson()
+) {
     fun pagedFlow(pageSize: Int = 30): Flow<PagingData<SearchItem>> {
         return Pager(
             config = PagingConfig(
@@ -38,6 +42,25 @@ class BookmarkRepository(private val bookmarkDao: BookmarkDao) {
                 meaningSummary = item.meaningSummary
             )
         )
+    }
+
+    suspend fun upsertWithDetails(item: SearchItem, details: WordDetailsResponse) {
+        bookmarkDao.upsert(
+            BookmarkEntity(
+                id = item.id,
+                primaryWriting = item.primaryWriting,
+                kana = item.kana,
+                meaningSummary = item.meaningSummary,
+                detailsJson = gson.toJson(details),
+                detailsSavedAt = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun getSavedDetails(id: Int): WordDetailsResponse? {
+        val json = bookmarkDao.getDetailsJsonById(id)?.trim().orEmpty()
+        if (json.isBlank()) return null
+        return runCatching { gson.fromJson(json, WordDetailsResponse::class.java) }.getOrNull()
     }
 
     suspend fun deleteById(id: Int) {

@@ -707,7 +707,7 @@ fun ShinjikaiApp(
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 val retryLoadDetails: () -> Unit = {
-                                    selectedItem?.let { openDetails(it) }
+                                    viewModel.retryDetailsLoad()
                                 }
 
                                 if (loadingDetails) {
@@ -1057,7 +1057,7 @@ fun ShinjikaiApp(
                                                         if (viewModel.isBookmarkEditMode) {
                                                             toggleSelection(bookmark.id)
                                                         } else {
-                                                            openDetails(item)
+                                                            viewModel.openBookmarkedDetails(item)
                                                         }
                                                     },
                                                 shape = RoundedCornerShape(18.dp),
@@ -1489,16 +1489,24 @@ private fun normalizeMeaningNote(raw: String): String {
     return cleaned
 }
 
+private val API_IMAGE_FILENAME_REGEX =
+    Regex("""(?i)^[^/\\?#]+\.(png|jpe?g|webp|gif|bmp|svg)$""")
+
 private fun normalizeApiImageUrl(raw: String): String? {
     val trimmed = raw.trim()
     if (trimmed.isBlank()) return null
 
+    // The API sometimes returns just a filename (e.g. "4825.jpg") without a path.
+    // The website serves those under /static/word_pictures/<filename>.
+    val normalized = trimmed.replace('\\', '/')
     return when {
-        trimmed.startsWith("http://", ignoreCase = true) -> trimmed
-        trimmed.startsWith("https://", ignoreCase = true) -> trimmed
-        trimmed.startsWith("//") -> "https:$trimmed"
-        trimmed.startsWith("/") -> "https://shinjikai.app$trimmed"
-        else -> "https://shinjikai.app/$trimmed"
+        normalized.startsWith("https://", ignoreCase = true) -> normalized
+        // Android blocks cleartext HTTP by default on modern targetSdk; try HTTPS first.
+        normalized.startsWith("http://", ignoreCase = true) -> "https://${normalized.removePrefix("http://")}"
+        normalized.startsWith("//") -> "https:$normalized"
+        normalized.startsWith("/") -> "https://shinjikai.app$normalized"
+        API_IMAGE_FILENAME_REGEX.matches(normalized) -> "https://shinjikai.app/static/word_pictures/$normalized"
+        else -> "https://shinjikai.app/$normalized"
     }
 }
 
