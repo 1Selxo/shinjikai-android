@@ -12,7 +12,7 @@ class BookmarkRepository(
     private val bookmarkDao: BookmarkDao,
     private val gson: Gson = Gson()
 ) {
-    fun pagedFlow(pageSize: Int = 30): Flow<PagingData<SearchItem>> {
+    fun pagedFlow(pageSize: Int = 30): Flow<PagingData<BookmarkItem>> {
         return Pager(
             config = PagingConfig(
                 pageSize = pageSize,
@@ -21,7 +21,7 @@ class BookmarkRepository(
             ),
             pagingSourceFactory = { bookmarkDao.pagingSource() }
         ).flow.map { pagingData ->
-            pagingData.map { entity -> entity.toSearchItem() }
+            pagingData.map { entity -> entity.toBookmarkItem() }
         }
     }
 
@@ -34,17 +34,20 @@ class BookmarkRepository(
     }
 
     suspend fun upsert(item: SearchItem) {
+        val createdAt = bookmarkDao.getCreatedAt(item.id) ?: System.currentTimeMillis()
         bookmarkDao.upsert(
             BookmarkEntity(
                 id = item.id,
                 primaryWriting = item.primaryWriting,
                 kana = item.kana,
-                meaningSummary = item.meaningSummary
+                meaningSummary = item.meaningSummary,
+                createdAt = createdAt
             )
         )
     }
 
     suspend fun upsertWithDetails(item: SearchItem, details: WordDetailsResponse) {
+        val createdAt = bookmarkDao.getCreatedAt(item.id) ?: System.currentTimeMillis()
         bookmarkDao.upsert(
             BookmarkEntity(
                 id = item.id,
@@ -52,7 +55,8 @@ class BookmarkRepository(
                 kana = item.kana,
                 meaningSummary = item.meaningSummary,
                 detailsJson = gson.toJson(details),
-                detailsSavedAt = System.currentTimeMillis()
+                detailsSavedAt = System.currentTimeMillis(),
+                createdAt = createdAt
             )
         )
     }

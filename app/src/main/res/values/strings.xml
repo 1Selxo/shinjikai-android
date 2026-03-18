@@ -1,3 +1,71 @@
-﻿<resources>
+<resources>
     <string name="app_name">قاموس شِنجِكاي</string>
+    <string name="nav_back">رجوع</string>
+    <string name="nav_bookmarks">المحفوظات</string>
+    <string name="nav_settings">الإعدادات</string>
+    <string name="nav_clear">مسح</string>
+    <string name="nav_search">بحث</string>
+
+    <string name="detail_title">تفاصيل الكلمة</string>
+    <string name="detail_not_selected">لم يتم اختيار كلمة</string>
+    <string name="detail_definitions_title">المعاني</string>
+    <string name="detail_pictures_title">الصور</string>
+    <string name="detail_related_words_title">كلمات ذات صلة</string>
+    <string name="detail_examples_title">الأمثلة</string>
+    <string name="detail_note_prefix">ملاحظة:</string>
+    <string name="detail_no_reading">لا توجد قراءة</string>
+    <string name="detail_japanese_audio_unavailable">الصوت الياباني غير متاح حالياً</string>
+    <string name="detail_word_copied">تم نسخ الكلمة</string>
+    <string name="detail_example_copied">تم نسخ المثال</string>
+    <string name="detail_example_fallback">مثال</string>
+    <string name="detail_image_load_error">تعذّر التحميل</string>
+    <string name="detail_retry">إعادة المحاولة</string>
+    <string name="detail_show_more">عرض المزيد</string>
+    <string name="detail_show_less">عرض أقل</string>
+    <string name="detail_card_collapse">طي البطاقة</string>
+    <string name="detail_card_show_count">عرض %1$d</string>
+    <string name="detail_category_label">التصنيف</string>
+    <string name="detail_category_fallback">التصنيف %1$d</string>
+    <string name="detail_commonness_label">الشيوع %1$s</string>
+
+    <string name="search_hint">اكتب باليابانية أو العربية أو بالرومـاجي</string>
+    <string name="search_clear_history">مسح سجل البحث</string>
+    <string name="search_no_results">لا توجد نتائج</string>
+
+    <string name="bookmarks_title">المحفوظات</string>
+    <string name="bookmarks_selected_count">%1$d محدد</string>
+    <string name="bookmarks_select_all">تحديد الكل</string>
+    <string name="bookmarks_delete">حذف</string>
+    <string name="bookmarks_done">تم</string>
+    <string name="bookmarks_manage">إدارة</string>
+    <string name="bookmarks_empty">لا توجد كلمات محفوظة</string>
+    <string name="bookmarks_added_at">أضيفت: %1$s</string>
+    <string name="bookmarks_delete_confirmation_title">حذف من المحفوظات؟</string>
+    <string name="bookmarks_delete_count">سيتم حذف %1$d كلمات</string>
+    <string name="action_cancel">إلغاء</string>
+
+    <string name="settings_title">الإعدادات</string>
+    <string name="settings_dark_mode">الوضع الداكن</string>
+    <string name="settings_dynamic_color">الألوان الديناميكية</string>
+    <string name="settings_offline_mode">وضع عدم الاتصال بالإنترنت</string>
+    <string name="settings_local_dictionary">القاموس المحلي</string>
+    <string name="settings_local_count">العناصر المتوفرة محلياً: %1$d</string>
+    <string name="settings_last_local_update">آخر تحديث محلي: %1$s</string>
+    <string name="settings_loading_inline">جاري التحميل...</string>
+    <string name="settings_download_local_dictionary">تحميل القاموس المحلي</string>
+    <string name="settings_github">GitHub</string>
+    <string name="settings_open_github">Open GitHub</string>
+
+    <string name="mode_online">متصل</string>
+    <string name="mode_offline">غير متصل</string>
+
+    <string name="error_details_load">تعذّر تحميل التفاصيل</string>
+    <string name="error_bookmark_not_available_offline">هذه الكلمة غير محفوظة بدون إنترنت. احذفها من المحفوظات ثم أضفها مرة أخرى أثناء الاتصال.</string>
+    <string name="error_bookmark_save">تعذّر حفظ الكلمة في المحفوظات.</string>
+
+    <string name="offline_import_phase_download">جاري تنزيل ملف القاموس...</string>
+    <string name="offline_import_phase_index">جاري فهرسة القاموس المحلي...</string>
+    <string name="offline_import_success">تم تحميل %1$d كلمة للاستخدام بدون إنترنت.</string>
+    <string name="offline_import_failure">فشل تحميل القاموس المحلي.</string>
+    <string name="offline_import_invalid_zip">ملف القاموس الذي تم تنزيله غير صالح.</string>
 </resources>

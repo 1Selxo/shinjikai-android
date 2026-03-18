@@ -24,6 +24,9 @@ interface BookmarkDao {
     @Query("SELECT detailsJson FROM bookmarks WHERE id = :id LIMIT 1")
     suspend fun getDetailsJsonById(id: Int): String?
 
+    @Query("SELECT createdAt FROM bookmarks WHERE id = :id LIMIT 1")
+    suspend fun getCreatedAt(id: Int): Long?
+
     @Query("DELETE FROM bookmarks WHERE id = :id")
     suspend fun deleteById(id: Int)
 

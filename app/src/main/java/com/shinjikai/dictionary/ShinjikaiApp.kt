@@ -1,69 +1,28 @@
 package com.shinjikai.dictionary
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.speech.tts.TextToSpeech
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.ClickableText
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.ClearAll
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Done
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -71,66 +30,28 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextDirection
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.Typography
-import coil.compose.SubcomposeAsyncImage
-import coil.compose.SubcomposeAsyncImageContent
-import com.google.gson.JsonElement
-import com.google.gson.JsonObject
-import com.shinjikai.dictionary.data.Meaning
-import com.shinjikai.dictionary.data.RelatedWordItem
-import com.shinjikai.dictionary.data.SearchItem
-import com.shinjikai.dictionary.data.SentenceExample
-import android.widget.Toast
-import androidx.compose.ui.layout.ContentScale
-import java.text.DateFormat
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-import java.util.Date
-import java.util.Locale
-
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.shinjikai.dictionary.ui.ResultMode
 import com.shinjikai.dictionary.ui.Screen
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
-
-private data class CategoryChipModel(
-    val id: Int,
-    val label: String
-)
+import java.util.Locale
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -143,63 +64,30 @@ fun ShinjikaiApp(
     val clipboardManager = LocalClipboardManager.current
     val viewModel: ShinjikaiViewModel = viewModel()
     val settings by viewModel.settings.collectAsState()
-    val useOfflineMode = settings.useOfflineMode
-    val isDarkMode = settings.darkMode
-    val useDynamicColor = settings.useDynamicColor
-
-    var textToSpeech by remember(context) { mutableStateOf<TextToSpeech?>(null) }
-    var canSpeakJapanese by remember { mutableStateOf(false) }
-    val isImportingOfflineData = viewModel.isImportingOfflineData
-    val offlineImportProgress = viewModel.offlineImportProgress
-    val offlineImportPhase = viewModel.offlineImportPhase
-    val offlineImportStatus = viewModel.offlineImportStatus
-    val offlineLastImportEpochMs = viewModel.offlineLastImportEpochMs
-    val offlineTermCount = viewModel.offlineTermCount
+    val currentScreen = viewModel.currentScreen
+    val screenStack = viewModel.screenStack
     val appName = stringResource(id = R.string.app_name)
+    val supportsDynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val appVersionLabel = remember(context) {
         runCatching {
             val info = context.packageManager.getPackageInfo(context.packageName, 0)
-            val code = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                info.longVersionCode
-            } else {
+            val code = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode else {
                 @Suppress("DEPRECATION")
                 info.versionCode.toLong()
             }
             "v${info.versionName ?: "?"} ($code)"
         }.getOrDefault("v1.0")
     }
-    val supportsDynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
-    val term = viewModel.term
-    val loading = viewModel.loading
-    val loadingDetails = viewModel.loadingDetails
-    val error = viewModel.error
-    val detailsError = viewModel.detailsError
-    val results = viewModel.results
-    val resultHeader = viewModel.resultHeader
-    val resultMode = viewModel.resultMode
-    val activeResultQuery = viewModel.activeResultQuery
-    val currentResultsPage = viewModel.currentResultsPage
-    val currentResultsPageCount = viewModel.currentResultsPageCount
-    val currentResultsTotalCount = viewModel.currentResultsTotalCount
-    val loadingMore = viewModel.loadingMore
-    val details = viewModel.details
-    val selectedItem = viewModel.selectedItem
-    val currentScreen = viewModel.currentScreen
-    val screenStack = viewModel.screenStack
-    var isSearchFieldFocused by remember { mutableStateOf(false) }
-    val bookmarkedItems = viewModel.bookmarkedItems
-    val recentSearches = viewModel.recentSearches
-    val categoryNameById = viewModel.categoryNameById
-    val activeCategoryId = viewModel.activeCategoryId
-    val activeCategoryName = viewModel.activeCategoryName
+    var textToSpeech by remember(context) { mutableStateOf<TextToSpeech?>(null) }
+    var canSpeakJapanese by remember { mutableStateOf(false) }
 
     DisposableEffect(context) {
         var disposed = false
-        var tts: TextToSpeech? = null
+        var localTts: TextToSpeech? = null
         val instance = TextToSpeech(context) { status ->
             if (disposed) return@TextToSpeech
-            val ready = tts ?: return@TextToSpeech
+            val ready = localTts ?: return@TextToSpeech
             if (status == TextToSpeech.SUCCESS) {
                 val result = ready.setLanguage(Locale.JAPANESE)
                 canSpeakJapanese = result != TextToSpeech.LANG_MISSING_DATA &&
@@ -208,12 +96,9 @@ fun ShinjikaiApp(
                 canSpeakJapanese = false
             }
         }
-        tts = instance
-        val initResult = instance.setLanguage(Locale.JAPANESE)
-        canSpeakJapanese = initResult != TextToSpeech.LANG_MISSING_DATA && initResult != TextToSpeech.LANG_NOT_SUPPORTED
-
+        localTts = instance
         instance.setSpeechRate(0.92f)
-        instance.setPitch(1.0f)
+        instance.setPitch(1f)
         textToSpeech = instance
         onDispose {
             disposed = true
@@ -225,8 +110,18 @@ fun ShinjikaiApp(
     }
 
     LaunchedEffect(currentScreen) {
-        if (currentScreen == Screen.Settings) {
-            viewModel.refreshOfflineTermCount()
+        if (currentScreen == Screen.Settings) viewModel.refreshOfflineTermCount()
+    }
+
+    LaunchedEffect(externalSearchTerm) {
+        val incoming = externalSearchTerm?.trim().orEmpty()
+        if (incoming.isNotBlank()) {
+            screenStack.clear()
+            screenStack.add(Screen.Search)
+            viewModel.currentScreen = Screen.Search
+            viewModel.term = incoming
+            viewModel.runSearchForTerm(incoming)
+            onExternalSearchTermConsumed()
         }
     }
 
@@ -240,80 +135,30 @@ fun ShinjikaiApp(
         onBackground = androidx.compose.ui.graphics.Color(0xFFE8EAED),
         onSurface = androidx.compose.ui.graphics.Color(0xFFE8EAED)
     )
-
     val lightColors = lightColorScheme(
         primary = androidx.compose.ui.graphics.Color(0xFF2A5EA8),
-        onPrimary = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
+        onPrimary = androidx.compose.ui.graphics.Color.White,
         secondary = androidx.compose.ui.graphics.Color(0xFF00796B),
         background = androidx.compose.ui.graphics.Color(0xFFF4F7FB),
-        surface = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
+        surface = androidx.compose.ui.graphics.Color.White,
         surfaceVariant = androidx.compose.ui.graphics.Color(0xFFDCE4F0),
         onBackground = androidx.compose.ui.graphics.Color(0xFF10131A),
         onSurface = androidx.compose.ui.graphics.Color(0xFF10131A)
     )
-
-    val constrainedDynamicColors = if (useDynamicColor && supportsDynamicColor) {
-        val dynamicBase = if (isDarkMode) {
-            dynamicDarkColorScheme(context)
-        } else {
-            dynamicLightColorScheme(context)
-        }
-        val neutralBase = if (isDarkMode) darkColors else lightColors
-        dynamicBase.copy(
-            background = neutralBase.background,
-            surface = neutralBase.surface,
-            surfaceVariant = neutralBase.surfaceVariant,
-            onBackground = neutralBase.onBackground,
-            onSurface = neutralBase.onSurface
-        )
-    } else {
-        null
-    }
-
     val colorScheme = when {
-        constrainedDynamicColors != null -> constrainedDynamicColors
-        isDarkMode -> darkColors
+        settings.useDynamicColor && supportsDynamicColor && settings.darkMode -> dynamicDarkColorScheme(context).copy(
+            background = darkColors.background,
+            surface = darkColors.surface,
+            surfaceVariant = darkColors.surfaceVariant
+        )
+        settings.useDynamicColor && supportsDynamicColor -> dynamicLightColorScheme(context).copy(
+            background = lightColors.background,
+            surface = lightColors.surface,
+            surfaceVariant = lightColors.surfaceVariant
+        )
+        settings.darkMode -> darkColors
         else -> lightColors
     }
-
-    val runSearchForTerm: (String) -> Unit = { rawTerm -> viewModel.runSearchForTerm(rawTerm) }
-    val runSearch: () -> Unit = {
-        focusManager.clearFocus()
-        viewModel.runSearch()
-    }
-    val runCategorySearch: (Int, String) -> Unit = { categoryId, categoryName ->
-        focusManager.clearFocus()
-        viewModel.runCategorySearch(categoryId, categoryName)
-    }
-    val clearCategorySearch: () -> Unit = {
-        viewModel.clearCategorySearch()
-        focusManager.clearFocus()
-    }
-    LaunchedEffect(externalSearchTerm) {
-        val incoming = externalSearchTerm?.trim().orEmpty()
-        if (incoming.isNotBlank()) {
-            screenStack.clear()
-            screenStack.add(Screen.Search)
-            viewModel.currentScreen = Screen.Search
-            viewModel.term = incoming
-            runSearchForTerm(incoming)
-            onExternalSearchTermConsumed()
-        }
-    }
-
-    val canLoadMoreResults = viewModel.canLoadMoreResults()
-    val loadMoreResults: () -> Unit = { viewModel.loadMoreResults() }
-    val navigateTo: (Screen) -> Unit = { screen -> viewModel.navigateTo(screen) }
-    val goBack: () -> Unit = { viewModel.goBack() }
-    val openDetails: (SearchItem) -> Unit = { item ->
-        focusManager.clearFocus()
-        viewModel.openDetails(item)
-    }
-    val openDetailsByRelatedItem: (RelatedWordItem) -> Unit = { relatedItem ->
-        focusManager.clearFocus()
-        viewModel.openDetailsByRelatedItem(relatedItem)
-    }
-    val importOfflineDictionary: () -> Unit = { viewModel.importOfflineDictionary() }
 
     val arabicFontFamily = FontFamily(Font(R.font.noto_sans_arabic))
     val baseTypography = Typography()
@@ -335,1923 +180,103 @@ fun ShinjikaiApp(
         labelSmall = baseTypography.labelSmall.copy(fontFamily = arabicFontFamily)
     )
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = appTypography
-    ) {
+    MaterialTheme(colorScheme = colorScheme, typography = appTypography) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-            BackHandler(enabled = screenStack.size > 1) {
-                goBack()
-            }
-
+            BackHandler(enabled = screenStack.size > 1) { viewModel.goBack() }
             Surface(color = MaterialTheme.colorScheme.background) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    when (currentScreen) {
-                        Screen.Search -> {
-                            val searchFocusRequester = remember { FocusRequester() }
-                            Scaffold(
-                                topBar = {
-                                    TopAppBar(
-                                        title = {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                Text(appName)
-                                                ModeBadge(useOfflineMode = useOfflineMode)
-                                            }
-                                        },
-                                        actions = {
-                                            IconButton(onClick = { navigateTo(Screen.Bookmarks) }) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Bookmark,
-                                                    contentDescription = "\u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0627\u062a"
-                                                )
-                                            }
-
-                                            IconButton(onClick = { navigateTo(Screen.Settings) }) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Settings,
-                                                    contentDescription = "\u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a"
-                                                )
-                                            }
-                                        }
-                                    )
-                                }
-                            ) { padding ->
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(padding)
-                                        .padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    if (activeCategoryName != null) {
-                                        CategorySearchBanner(
-                                            label = activeCategoryName.orEmpty(),
-                                            onClear = clearCategorySearch
-                                        )
-                                    } else {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        OutlinedTextField(
-                                            value = term,
-                                            onValueChange = { viewModel.term = it },
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .focusRequester(searchFocusRequester)
-                                                .onFocusChanged { state ->
-                                                    isSearchFieldFocused = state.isFocused
-                                                },
-                                            singleLine = true,
-                                            label = { Text("\u0627\u0643\u062a\u0628 \u0628\u0627\u0644\u064a\u0627\u0628\u0627\u0646\u064a\u0629 \u0623\u0648 \u0627\u0644\u0639\u0631\u0628\u064a\u0629 \u0623\u0648 \u0628\u0627\u0644\u0631\u0648\u0645\u0627\u062c\u064a") },
-                                            shape = RoundedCornerShape(20.dp),
-                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                            keyboardActions = KeyboardActions(onSearch = { runSearch() }),
-                                            trailingIcon = {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                ) {
-                                                    if (term.isNotEmpty()) {
-                                                        IconButton(
-                                                            onClick = {
-                                                                viewModel.term = ""
-                                                                searchFocusRequester.requestFocus()
-                                                            }
-                                                        ) {
-                                                            Icon(
-                                                                imageVector = Icons.Default.Close,
-                                                                contentDescription = "\u0645\u0633\u062d"
-                                                            )
-                                                        }
-                                                    }
-                                                    IconButton(
-                                                        onClick = {
-                                                            focusManager.clearFocus()
-                                                            runSearch()
-                                                        }
-                                                    ) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.Search,
-                                                            contentDescription = "\u0628\u062d\u062b"
-                                                        )
-                                                    }
-                                                }
-                                            },
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
-                                            )
-                                        )
-                                    }
-                                }
-
-                                val historyItems = if (term.isBlank()) {
-                                    recentSearches
-                                } else {
-                                    recentSearches.filter { it.startsWith(term.trim(), ignoreCase = true) }
-                                }
-                                if (isSearchFieldFocused && historyItems.isNotEmpty() && results.isEmpty() && !loading) {
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(14.dp),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.surface
-                                        )
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(vertical = 8.dp)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable {
-                                                        viewModel.clearRecentSearches()
-                                                    }
-                                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.ClearAll,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                                )
-                                                Text(
-                                                    text = "\u0645\u0633\u062d \u0633\u062c\u0644 \u0627\u0644\u0628\u062d\u062b",
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
-                                                )
-                                            }
-
-                                            historyItems.take(8).forEach { historyTerm ->
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clickable {
-                                                            viewModel.term = historyTerm
-                                                            focusManager.clearFocus()
-                                                            runSearch()
-                                                        }
-                                                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.History,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                                    )
-                                                    Text(
-                                                        text = historyTerm,
-                                                        style = MaterialTheme.typography.bodyLarge
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                if (loading) {
-                                    Box(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CircularProgressIndicator()
-                                    }
-                                }
-
-                                error?.let {
-                                    Text(text = it, color = MaterialTheme.colorScheme.error)
-                                }
-
-                                val showLanding = term.isBlank() && results.isEmpty() && error == null && !loading
-                                val showNoResults = term.isNotBlank() && results.isEmpty() && error == null && !loading
-
-                                when {
-                                    showLanding -> {
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .fillMaxWidth(),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = appName,
-                                                style = MaterialTheme.typography.headlineMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                textAlign = TextAlign.Center
-                                            )
-                                        }
-                                    }
-
-                                    showNoResults -> {
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .fillMaxWidth(),
-                                            contentAlignment = Alignment.TopCenter
-                                        ) {
-                                            Text(
-                                                text = "\u0644\u0627 \u062a\u0648\u062c\u062f \u0646\u062a\u0627\u0626\u062c",
-                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                        }
-                                    }
-
-                                    else -> {
-                                        LazyColumn(
-                                            modifier = Modifier.weight(1f),
-                                            contentPadding = PaddingValues(vertical = 4.dp),
-                                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                                        ) {
-                                            items(results, key = { it.id }) { item ->
-                                                Card(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clickable { openDetails(item) },
-                                                    shape = RoundedCornerShape(18.dp),
-                                                    colors = CardDefaults.cardColors(
-                                                        containerColor = MaterialTheme.colorScheme.surface
-                                                    )
-                                                ) {
-                                                    Column(modifier = Modifier.padding(14.dp)) {
-                                                        Text(
-                                                            text = item.kana,
-                                                            style = MaterialTheme.typography.titleMedium,
-                                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
-                                                        )
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                            verticalAlignment = Alignment.CenterVertically
-                                                        ) {
-                                                            Text(
-                                                                text = item.primaryWriting.ifBlank { item.kana },
-                                                                style = MaterialTheme.typography.headlineMedium,
-                                                                fontWeight = FontWeight.SemiBold,
-                                                                modifier = Modifier.weight(1f)
-                                                            )
-                                                            CommonnessBadge(difficulty = item.difficulty)
-                                                        }
-                                                        Text(
-                                                            text = forceRtlText(
-                                                                if (useOfflineMode) {
-                                                                    formatOfflineSearchPreview(item.meaningSummary)
-                                                                } else {
-                                                                    item.meaningSummary
-                                                                }
-                                                            ),
-                                                            style = MaterialTheme.typography.bodyLarge.copy(
-                                                                textDirection = TextDirection.Rtl
-                                                            ),
-                                                            textAlign = TextAlign.Right,
-                                                            maxLines = if (useOfflineMode || activeCategoryId != null) 1 else Int.MAX_VALUE,
-                                                            overflow = TextOverflow.Ellipsis,
-                                                            modifier = Modifier
-                                                                .fillMaxWidth()
-                                                                .padding(top = 8.dp)
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            if (loadingMore || canLoadMoreResults) {
-                                                item(key = "load-more") {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .padding(vertical = 8.dp),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        if (loadingMore) {
-                                                            CircularProgressIndicator()
-                                                        } else {
-                                                            TextButton(onClick = loadMoreResults) {
-                                                                Text("\u0639\u0631\u0636 \u0627\u0644\u0645\u0632\u064a\u062f")
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                when (currentScreen) {
+                    Screen.Search -> SearchScreenContent(
+                        appName = appName,
+                        useOfflineMode = settings.useOfflineMode,
+                        viewModel = viewModel,
+                        uiState = viewModel.searchUiState,
+                        searchResults = viewModel.searchResults,
+                        onNavigateTo = viewModel::navigateTo,
+                        onOpenDetails = {
+                            focusManager.clearFocus()
+                            viewModel.openDetails(it)
                         }
-                    }
-
-                    Screen.Detail -> {
-                        val item = selectedItem
-                        val isBookmarked = item?.let { selected ->
-                            bookmarkedItems.any { it.id == selected.id }
-                        } == true
-
-                        Scaffold(
-                            topBar = {
-                                TopAppBar(
-                                    title = {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Text("\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u0643\u0644\u0645\u0629")
-                                            ModeBadge(useOfflineMode = useOfflineMode)
-                                        }
-                                    },
-                                    navigationIcon = {
-                                        IconButton(
-                                            onClick = goBack
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                                contentDescription = "\u0631\u062c\u0648\u0639"
-                                            )
-                                        }
-                                    },
-                                    actions = {
-                                        IconButton(
-                                            onClick = {
-                                                item ?: return@IconButton
-                                                viewModel.toggleBookmark(item)
-                                            }
-                                        ) {
-                                            Icon(
-                                                imageVector = if (isBookmarked) {
-                                                    Icons.Default.Bookmark
-                                                } else {
-                                                    Icons.Outlined.BookmarkBorder
-                                                },
-                                                contentDescription = if (isBookmarked) {
-                                                    "\u0625\u0632\u0627\u0644\u0629 \u0645\u0646 \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0627\u062a"
-                                                } else {
-                                                    "\u0625\u0636\u0627\u0641\u0629 \u0625\u0644\u0649 \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0627\u062a"
-                                                }
-                                            )
-                                        }
-
-                                    }
-                                )
-                            }
-                        ) { padding ->
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(padding)
-                                    .padding(16.dp)
-                                    .verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                val retryLoadDetails: () -> Unit = {
-                                    viewModel.retryDetailsLoad()
-                                }
-
-                                if (loadingDetails) {
-                                    DetailLoadingSkeleton()
-                                    return@Column
-                                }
-
-                                detailsError?.let {
-                                    DetailStateCard(
-                                        title = "\u062a\u0639\u0630\u0651\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644",
-                                        message = it,
-                                        actionLabel = "\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629",
-                                        onAction = retryLoadDetails
-                                    )
-                                }
-
-                                if (item == null) {
-                                    Text("\u0644\u0645 \u064a\u062a\u0645 \u0627\u062e\u062a\u064a\u0627\u0631 \u0643\u0644\u0645\u0629")
-                                    return@Column
-                                }
-
-                                val hasLocalFallback = item.primaryWriting.isNotBlank() ||
-                                    item.kana.isNotBlank() ||
-                                    item.meaningSummary.isNotBlank()
-                                if (details == null && !hasLocalFallback) {
-                                    DetailStateCard(
-                                        title = "\u0644\u0627 \u062a\u0648\u062c\u062f \u062a\u0641\u0627\u0635\u064a\u0644",
-                                        message = "\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0628\u064a\u0627\u0646\u0627\u062a \u0647\u0630\u0647 \u0627\u0644\u0643\u0644\u0645\u0629 \u062d\u0627\u0644\u064a\u0627\u064b.",
-                                        actionLabel = "\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u062a\u062d\u0645\u064a\u0644",
-                                        onAction = retryLoadDetails
-                                    )
-                                    return@Column
-                                }
-
-                                val kanji = details?.word?.writings
-                                    ?.firstOrNull { it.text.isNotBlank() }
-                                    ?.text
-                                    .orEmpty()
-                                    .ifBlank { item.primaryWriting.ifBlank { "-" } }
-
-                                val kana = details?.word?.kana.orEmpty().ifBlank { item.kana.ifBlank { "-" } }
-
-                                val definitionChunk = formatDefinition(details?.word?.meanings)
-                                    .ifBlank { item.meaningSummary.ifBlank { "-" } }
-                                val jlptLevel = details?.word?.jlpt
-                                    ?.takeIf { it in 1..5 }
-                                    ?: item.jlpt.takeIf { it in 1..5 }
-                                val commonnessLevel = details?.word?.difficulty
-                                    ?.takeIf { it in 1..5 }
-                                    ?: item.difficulty.takeIf { it in 1..5 }
-
-
-                                val categoryChips = details?.word?.categoryIds
-                                    .orEmpty()
-                                    .mapNotNull { categoryId ->
-                                        categoryNameById[categoryId]
-                                            ?.takeIf { it.isNotBlank() }
-                                            ?.let { CategoryChipModel(id = categoryId, label = it) }
-                                    }
-                                    .distinctBy { it.id }
-                                val metadataChips = buildList {
-                                    jlptLevel?.let { add(CategoryChipModel(id = -it, label = "JLPT N$it")) }
-                                    commonnessLevel?.let { add(CategoryChipModel(id = -(100 + it), label = "\u0627\u0644\u0634\u064a\u0648\u0639 ${commonnessStars(it)}")) }
-                                    addAll(categoryChips)
-                                }
-
-                                DetailWordHeaderCard(
-                                    kanji = kanji,
-                                    kana = kana,
-                                    chips = metadataChips,
-                                    onSpeakKana = {
-                                        val textToSpeak = kana.trim().takeIf { it.isNotEmpty() && it != "-" }
-                                        when {
-                                            textToSpeak == null -> {
-                                                Toast.makeText(context, "\u0644\u0627 \u062a\u0648\u062c\u062f \u0642\u0631\u0627\u0621\u0629", Toast.LENGTH_SHORT).show()
-                                            }
-                                            !canSpeakJapanese || textToSpeech == null -> {
-                                                Toast.makeText(context, "\u0627\u0644\u0635\u0648\u062a \u0627\u0644\u064a\u0627\u0628\u0627\u0646\u064a \u063a\u064a\u0631 \u0645\u062a\u0627\u062d \u062f\u0648\u0646 \u0627\u062a\u0635\u0627\u0644", Toast.LENGTH_SHORT).show()
-                                            }
-                                            else -> {
-                                                textToSpeech?.speak(
-                                                    textToSpeak,
-                                                    TextToSpeech.QUEUE_FLUSH,
-                                                    null,
-                                                    "word-kana-${item.id}"
-                                                )
-                                            }
-                                        }
-                                    },
-                                    onCategoryClick = { categoryChip ->
-                                        navigateTo(Screen.Search)
-                                        focusManager.clearFocus()
-                                        runCategorySearch(categoryChip.id, categoryChip.label)
-                                    },
-                                    onKanjiClick = {
-                                        val textToCopy = kanji.trim()
-                                        if (textToCopy.isNotEmpty() && textToCopy != "-") {
-                                            clipboardManager.setText(AnnotatedString(textToCopy))
-                                            Toast.makeText(context, "\u062a\u0645 \u0646\u0633\u062e \u0627\u0644\u0643\u0644\u0645\u0629", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                )
-
-                                DefinitionsCard(
-                                    title = "\u0627\u0644\u0645\u0639\u0627\u0646\u064a",
-                                    definition = definitionChunk
-                                )
-
-                                val pictureUrls = details?.word?.meanings
-                                    .orEmpty()
-                                    .flatMap(::extractMeaningPictureUrls)
-                                    .mapNotNull(::normalizeApiImageUrl)
-                                    .distinct()
-
-                                if (pictureUrls.isNotEmpty()) {
-                                    PicturesCard(
-                                        title = "\u0627\u0644\u0635\u0648\u0631",
-                                        imageUrls = pictureUrls
-                                    )
-                                }
-
-                                val relatedFromWebsite = details?.similarWords
-                                    .orEmpty()
-                                    .map { relatedWord ->
-                                        RelatedWordItem(
-                                            wordId = relatedWord.id,
-                                            text = relatedWord.primaryWriting,
-                                            kana = relatedWord.kana
-                                        )
-                                    }
-
-                                val relatedFromMeanings = details?.word?.meanings
-                                    .orEmpty()
-                                    .flatMap { meaning ->
-                                        meaning.related.flatMap { group -> group.items }
-                                    }
-
-                                val relatedItems = (relatedFromWebsite + relatedFromMeanings)
-                                    .toMutableList()
-                                    .apply {
-                                        if (kanji == "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â«") {
-                                            addAll(
-                                                listOf(
-                                                    RelatedWordItem(text = "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â­ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â "),
-                                                    RelatedWordItem(text = "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¾ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â«"),
-                                                    RelatedWordItem(text = "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â«ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¾"),
-                                                    RelatedWordItem(text = "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â®ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¶ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸")
-                                                )
-                                            )
-                                        }
-                                    }
-                                    .filter { it.text.isNotBlank() || it.kana.isNotBlank() }
-                                    .distinctBy { "${it.wordId}|${it.meaningNo}|${it.text.trim()}|${it.kana.trim()}" }
-
-                                if (relatedItems.isNotEmpty()) {
-                                    RelatedWordsCard(
-                                        title = "\u0643\u0644\u0645\u0627\u062a \u0630\u0627\u062a \u0635\u0644\u0629",
-                                        items = relatedItems,
-                                        onWordClick = openDetailsByRelatedItem
-                                    )
-                                }
-
-                                val sentenceExamples = details?.sentenceSearch
-                                    .orEmpty()
-                                    .filter { it.text.isNotBlank() || it.kana.isNotBlank() || it.arabic.isNotBlank() }
-                                    .distinctBy { "${it.id}|${it.text.trim()}|${it.kana.trim()}|${it.arabic.trim()}" }
-
-                                if (sentenceExamples.isNotEmpty()) {
-                                    ExamplesCard(
-                                        title = "\u0627\u0644\u0623\u0645\u062b\u0644\u0629",
-                                        items = sentenceExamples
-                                    )
-                                }
-                        }
-                            }
-                    }
-                    Screen.Bookmarks -> {
-                        Scaffold(
-                            topBar = {
-                                TopAppBar(
-                                    title = {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Text(
-                                                if (viewModel.isBookmarkEditMode) {
-                                                    "${viewModel.selectedBookmarkIds.size} \u0645\u062d\u062f\u062f"
-                                                } else {
-                                                    "\u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0627\u062a"
-                                                }
-                                            )
-                                            ModeBadge(useOfflineMode = useOfflineMode)
-                                        }
-                                    },
-                                    navigationIcon = {
-                                        IconButton(onClick = goBack) {
-                                            Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                                contentDescription = "\u0631\u062c\u0648\u0639"
-                                            )
-                                        }
-                                    },
-                                    actions = {
-                                        if (viewModel.isBookmarkEditMode) {
-                                            val allIds = bookmarkedItems.map { it.id }.toSet()
-                                            val isAllSelected = allIds.isNotEmpty() &&
-                                                viewModel.selectedBookmarkIds.size == allIds.size
-
-                                            IconButton(
-                                                onClick = {
-                                                    viewModel.selectedBookmarkIds = if (isAllSelected) emptySet() else allIds
-                                                }
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.ClearAll,
-                                                    contentDescription = "\u062a\u062d\u062f\u064a\u062f \u0627\u0644\u0643\u0644"
-                                                )
-                                            }
-
-                                            IconButton(
-                                                onClick = {
-                                                    if (viewModel.selectedBookmarkIds.isNotEmpty()) {
-                                                        viewModel.pendingBookmarkDeletionIds = viewModel.selectedBookmarkIds
-                                                    }
-                                                }
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Delete,
-                                                    contentDescription = "\u062d\u0630\u0641"
-                                                )
-                                            }
-
-                                            IconButton(
-                                                onClick = {
-                                                    viewModel.isBookmarkEditMode = false
-                                                    viewModel.selectedBookmarkIds = emptySet()
-                                                }
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Done,
-                                                    contentDescription = "\u062a\u0645"
-                                                )
-                                            }
-                                        } else {
-                                            IconButton(onClick = { viewModel.isBookmarkEditMode = true }) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Edit,
-                                                    contentDescription = "\u0625\u062f\u0627\u0631\u0629"
-                                                )
-                                            }
-                                        }
-                                    }
-                                )
-                            }
-                        ) { padding ->
-                            if (bookmarkedItems.isEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(padding)
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.TopCenter
-                                ) {
-                                    Text(
-                                        text = "\u0644\u0627 \u062a\u0648\u062c\u062f \u0643\u0644\u0645\u0627\u062a \u0645\u062d\u0641\u0648\u0638\u0629",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
-                                    )
-                                }
-                            } else {
-                                val locale = Locale.getDefault()
-                                val dateFormatter = remember(locale) {
-                                    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
-                                }
-                                val timeFormatter = remember(locale) {
-                                    DateTimeFormatter.ofPattern("HH:mm", locale)
-                                }
-
-                                fun localDateOf(epochMs: Long): LocalDate {
-                                    return Instant.ofEpochMilli(epochMs)
-                                        .atZone(ZoneId.systemDefault())
-                                        .toLocalDate()
-                                }
-
-                                fun localTimeLabel(epochMs: Long): String {
-                                    return Instant.ofEpochMilli(epochMs)
-                                        .atZone(ZoneId.systemDefault())
-                                        .toLocalTime()
-                                        .format(timeFormatter)
-                                }
-
-                                fun toggleSelection(id: Int) {
-                                    viewModel.selectedBookmarkIds = if (viewModel.selectedBookmarkIds.contains(id)) {
-                                        viewModel.selectedBookmarkIds - id
-                                    } else {
-                                        viewModel.selectedBookmarkIds + id
-                                    }
-                                }
-
-                                LaunchedEffect(viewModel.isBookmarkEditMode, bookmarkedItems.size) {
-                                    if (!viewModel.isBookmarkEditMode) {
-                                        viewModel.selectedBookmarkIds = emptySet()
-                                        return@LaunchedEffect
-                                    }
-                                    val validIds = bookmarkedItems.map { it.id }.toSet()
-                                    viewModel.selectedBookmarkIds = viewModel.selectedBookmarkIds.intersect(validIds)
-                                }
-
-                                val sortedBookmarks by remember {
-                                    derivedStateOf {
-                                        bookmarkedItems.sortedByDescending { it.createdAt }
-                                    }
-                                }
-
-                                LazyColumn(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(padding)
-                                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    itemsIndexed(sortedBookmarks, key = { _, bookmark -> bookmark.id }) { index, bookmark ->
-                                        val item = bookmark.item
-                                        val thisDate = localDateOf(bookmark.createdAt)
-                                        val prevDate = sortedBookmarks
-                                            .getOrNull(index - 1)
-                                            ?.let { localDateOf(it.createdAt) }
-                                        val showHeader = prevDate == null || prevDate != thisDate
-
-                                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            if (showHeader) {
-                                                Text(
-                                                    text = thisDate.format(dateFormatter),
-                                                    style = MaterialTheme.typography.titleSmall,
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
-                                                    modifier = Modifier.padding(start = 6.dp, top = 6.dp)
-                                                )
-                                            }
-
-                                            val isSelected = viewModel.selectedBookmarkIds.contains(bookmark.id)
-
-                                            Card(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable {
-                                                        if (viewModel.isBookmarkEditMode) {
-                                                            toggleSelection(bookmark.id)
-                                                        } else {
-                                                            viewModel.openBookmarkedDetails(item)
-                                                        }
-                                                    },
-                                                shape = RoundedCornerShape(18.dp),
-                                                colors = CardDefaults.cardColors(
-                                                    containerColor = MaterialTheme.colorScheme.surface
-                                                )
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.padding(14.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                                ) {
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Text(
-                                                            text = item.kana,
-                                                            style = MaterialTheme.typography.titleMedium,
-                                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
-                                                        )
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                            verticalAlignment = Alignment.CenterVertically
-                                                        ) {
-                                                            Text(
-                                                                text = item.primaryWriting.ifBlank { item.kana },
-                                                                style = MaterialTheme.typography.headlineMedium,
-                                                                fontWeight = FontWeight.SemiBold,
-                                                                modifier = Modifier.weight(1f)
-                                                            )
-                                                            CommonnessBadge(difficulty = item.difficulty)
-                                                        }
-                                                        Text(
-                                                            text = forceRtlText(
-                                                                if (useOfflineMode) {
-                                                                    formatOfflineSearchPreview(item.meaningSummary)
-                                                                } else {
-                                                                    item.meaningSummary
-                                                                }
-                                                            ),
-                                                            style = MaterialTheme.typography.bodyLarge.copy(
-                                                                textDirection = TextDirection.Rtl
-                                                            ),
-                                                            textAlign = TextAlign.Right,
-                                                            maxLines = if (useOfflineMode || activeCategoryId != null) 1 else Int.MAX_VALUE,
-                                                            overflow = TextOverflow.Ellipsis,
-                                                            modifier = Modifier
-                                                                .fillMaxWidth()
-                                                                .padding(top = 8.dp)
-                                                        )
-                                                        Text(
-                                                            text = "\u0623\u0636\u064a\u0641\u062a: ${localTimeLabel(bookmark.createdAt)}",
-                                                            style = MaterialTheme.typography.labelMedium,
-                                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                                            textAlign = TextAlign.Right,
-                                                            modifier = Modifier
-                                                                .fillMaxWidth()
-                                                                .padding(top = 10.dp)
-                                                        )
-                                                    }
-
-                                                    if (viewModel.isBookmarkEditMode) {
-                                                        Checkbox(
-                                                            checked = isSelected,
-                                                            onCheckedChange = { toggleSelection(bookmark.id) }
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            viewModel.pendingBookmarkDeletionIds?.let { ids ->
-                                val idsList = ids.toList()
-                                val isSingle = idsList.size == 1
-                                val label = if (isSingle) {
-                                    val firstId = idsList.first()
-                                    val target = bookmarkedItems.firstOrNull { it.id == firstId }?.item
-                                    (target?.primaryWriting ?: "").ifBlank {
-                                        (target?.kana ?: "").ifBlank { "ID $firstId" }
-                                    }
-                                } else {
-                                    "\u0633\u064a\u062a\u0645 \u062d\u0630\u0641 ${idsList.size} \u0643\u0644\u0645\u0627\u062a"
-                                }
-
-                                AlertDialog(
-                                    onDismissRequest = { viewModel.pendingBookmarkDeletionIds = null },
-                                    title = { Text("\u062d\u0630\u0641 \u0645\u0646 \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0627\u062a\u061f") },
-                                    text = { Text(label) },
-                                    confirmButton = {
-                                        TextButton(
-                                            onClick = {
-                                                val toDelete = idsList
-                                                viewModel.deleteBookmarks(toDelete)
-                                            }
-                                        ) {
-                                            Text("\u062d\u0630\u0641")
-                                        }
-                                    },
-                                    dismissButton = {
-                                        TextButton(onClick = { viewModel.pendingBookmarkDeletionIds = null }) {
-                                            Text("\u0625\u0644\u063a\u0627\u0621")
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    Screen.Settings -> {
-                        Scaffold(
-                            topBar = {
-                                TopAppBar(
-                                    title = {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Text("\u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a")
-                                            ModeBadge(useOfflineMode = useOfflineMode)
-                                        }
-                                    },
-                                    navigationIcon = {
-                                        IconButton(onClick = goBack) {
-                                            Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                                contentDescription = "\u0631\u062c\u0648\u0639"
-                                            )
-                                        }
-                                    }
-                                )
-                            },
-                            bottomBar = {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = appVersionLabel,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
-                                    )
-                                }
-                            }
-                        ) { padding ->
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(padding)
-                                    .padding(16.dp)
-                                    .verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(18.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surface
-                                    )
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(14.dp),
-                                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text("\u0627\u0644\u0648\u0636\u0639 \u0627\u0644\u062f\u0627\u0643\u0646", style = MaterialTheme.typography.bodyLarge)
-                                            Switch(
-                                                checked = isDarkMode,
-                                            onCheckedChange = { enabled -> viewModel.setDarkMode(enabled) }
-                                            )
-                                        }
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text("\u0627\u0644\u0623\u0644\u0648\u0627\u0646 \u0627\u0644\u062f\u064a\u0646\u0627\u0645\u064a\u0643\u064a\u0629", style = MaterialTheme.typography.bodyLarge)
-                                            Switch(
-                                                checked = useDynamicColor && supportsDynamicColor,
-                                            onCheckedChange = { enabled -> viewModel.setUseDynamicColor(enabled) },
-                                                enabled = supportsDynamicColor
-                                            )
-                                        }
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text("\u0648\u0636\u0639 \u0639\u062f\u0645 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \u0628\u0627\u0644\u0625\u0646\u062a\u0631\u0646\u062a", style = MaterialTheme.typography.bodyLarge)
-                                            Switch(
-                                                checked = useOfflineMode,
-                                            onCheckedChange = { enabled -> viewModel.setUseOfflineMode(enabled) }
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(18.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surface
-                                    )
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(14.dp),
-                                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Text(
-                                            text = "\u0627\u0644\u0642\u0627\u0645\u0648\u0633 \u0627\u0644\u0645\u062d\u0644\u064a",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = "\u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0627\u0644\u0645\u062a\u0648\u0641\u0631\u0629 \u0645\u062d\u0644\u064a\u0627\u064b: $offlineTermCount",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
-                                        )
-                                        offlineLastImportEpochMs?.let { epoch ->
-                                            Text(
-                                                text = "\u0622\u062e\u0631 \u062a\u062d\u062f\u064a\u062b \u0645\u062d\u0644\u064a: ${formatEpochAsLocal(epoch)}",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
-                                            )
-                                        }
-
-                                        TextButton(
-                                            onClick = importOfflineDictionary,
-                                            enabled = !isImportingOfflineData
-                                        ) {
-                                            if (isImportingOfflineData) {
-                                                CircularProgressIndicator(
-                                                    modifier = Modifier
-                                                        .height(18.dp),
-                                                    strokeWidth = 2.dp
-                                                )
-                                                Text(
-                                                    text = " ${offlineImportPhase ?: "\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u0645\u064a\u0644..."}",
-                                                    modifier = Modifier.padding(start = 8.dp)
-                                                )
-                                            } else {
-                                                Text("\u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0642\u0627\u0645\u0648\u0633 \u0627\u0644\u0645\u062d\u0644\u064a")
-                                            }
-                                        }
-
-                                        if (isImportingOfflineData) {
-                                            LinearProgressIndicator(
-                                                progress = { offlineImportProgress },
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                        }
-
-                                        offlineImportStatus?.let { status ->
-                                            Text(
-                                                text = status,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            val intent = Intent(
-                                                Intent.ACTION_VIEW,
-                                                Uri.parse("https://github.com/obj44/shinjikai")
-                                            )
-                                            context.startActivity(intent)
-                                        },
-                                    shape = RoundedCornerShape(18.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surface
-                                    )
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 14.dp, vertical = 14.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "GitHub",
-                                            style = MaterialTheme.typography.bodyLarge
-                                        )
-                                        Icon(
-                                            imageVector = Icons.Default.OpenInNew,
-                                            contentDescription = "Open GitHub"
-                                        )
-                                    }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DetailLoadingSkeleton() {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        repeat(3) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                )
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(82.dp)
-                )
-            }
-        }
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator()
-        }
-    }
-}
-
-@Composable
-private fun DetailStateCard(
-    title: String,
-    message: String,
-    actionLabel: String,
-    onAction: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyLarge
-            )
-            TextButton(onClick = onAction) {
-                Text(actionLabel)
-            }
-        }
-    }
-}
-
-private fun formatDefinition(meanings: List<Meaning>?): String {
-    if (meanings.isNullOrEmpty()) return ""
-    val formatted = meanings.mapNotNull { meaning ->
-        val arabic = normalizeMeaningText(meaning.arabic)
-        val note = normalizeMeaningNote(meaning.note)
-        if (arabic.isEmpty() && note.isEmpty()) return@mapNotNull null
-
-        buildString {
-            append("\u2022 ")
-            append(if (arabic.isNotEmpty()) arabic else "-")
-            if (note.isNotEmpty()) {
-                append("\n")
-                append("\u0645\u0644\u0627\u062d\u0638\u0629: ")
-                append(note)
-            }
-        }
-    }
-    return formatted.joinToString(separator = "\n\n").trim()
-}
-
-private val MEANING_BULLET_PREFIX_REGEX =
-    Regex("(?m)^\\s*[\\uD83D\\uDD39\\u25AA\\u2022\\u25CF\\u25E6]\\s*")
-private const val JAPANESE_WORD_PATTERN =
-    "[\\p{IsHan}\\p{IsHiragana}\\p{IsKatakana}\\u30FC\\u3005\\u3006\\u30F6]+"
-private val JAPANESE_WORD_WITH_ID_PREFIX_REGEX = Regex("""\d{3,}\s+($JAPANESE_WORD_PATTERN)""")
-private val JAPANESE_WORD_WITH_ID_SUFFIX_REGEX = Regex("""($JAPANESE_WORD_PATTERN)\s+\d{3,}""")
-private val MEANING_ABBREV_NO_REGEX = Regex(
-    "\\(?\\s*\u0627\u062e\u062a\u0635\u0627\u0631\\s*[:\uFF1A]\\s*no\\s*\\)?",
-    RegexOption.IGNORE_CASE
-)
-
-private val MEANING_EMPTY_BRACES_REGEX = Regex("""\{\s*\}""")
-private val MEANING_TRAILING_SPACES_REGEX = Regex("""(?m)^\s+$""")
-private val MEANING_MULTISPACE_REGEX = Regex("""[ \t]{2,}""")
-private fun normalizeMeaningText(raw: String): String {
-    val trimmed = raw.trim()
-    if (trimmed.isBlank()) return ""
-
-    return trimmed
-        .replace("$", "")
-        .replace(MEANING_BULLET_PREFIX_REGEX, "")
-        .replace(MEANING_ABBREV_NO_REGEX, "")
-        .replace(JAPANESE_WORD_WITH_ID_PREFIX_REGEX, "$1")
-        .replace(JAPANESE_WORD_WITH_ID_SUFFIX_REGEX, "$1")
-        .replace(MEANING_EMPTY_BRACES_REGEX, "")
-        .replace(MEANING_TRAILING_SPACES_REGEX, "")
-        .replace(MEANING_MULTISPACE_REGEX, " ")
-        .trim()
-}
-private fun normalizeMeaningNote(raw: String): String {
-    val cleaned = normalizeMeaningText(raw)
-    if (cleaned.equals("no", ignoreCase = true)) return ""
-    if (cleaned.equals("-", ignoreCase = true)) return ""
-    return cleaned
-}
-
-private val API_IMAGE_FILENAME_REGEX =
-    Regex("""(?i)^[^/\\?#]+\.(png|jpe?g|webp|gif|bmp|svg)$""")
-
-private fun normalizeApiImageUrl(raw: String): String? {
-    val trimmed = raw.trim()
-    if (trimmed.isBlank()) return null
-
-    // The API sometimes returns just a filename (e.g. "4825.jpg") without a path.
-    // The website serves those under /static/word_pictures/<filename>.
-    val normalized = trimmed.replace('\\', '/')
-    return when {
-        normalized.startsWith("https://", ignoreCase = true) -> normalized
-        // Android blocks cleartext HTTP by default on modern targetSdk; try HTTPS first.
-        normalized.startsWith("http://", ignoreCase = true) -> "https://${normalized.removePrefix("http://")}"
-        normalized.startsWith("//") -> "https:$normalized"
-        normalized.startsWith("/") -> "https://shinjikai.app$normalized"
-        API_IMAGE_FILENAME_REGEX.matches(normalized) -> "https://shinjikai.app/static/word_pictures/$normalized"
-        else -> "https://shinjikai.app/$normalized"
-    }
-}
-
-private fun extractMeaningPictureUrls(meaning: Meaning): List<String> {
-    return meaning.pictures.mapNotNull(::extractApiPictureUrl)
-}
-
-private fun extractApiPictureUrl(element: JsonElement): String? {
-    return when {
-        element.isJsonNull -> null
-        element.isJsonPrimitive -> element.asJsonPrimitive.takeIf { it.isString }?.asString
-        element.isJsonObject -> extractApiPictureUrlFromObject(element.asJsonObject)
-        else -> null
-    }
-}
-
-private fun extractApiPictureUrlFromObject(obj: JsonObject): String? {
-    // Try common field names first.
-    val directKeys = listOf(
-        // Observed on shinjikai.app website bundles: { Filename: "4825.jpg", ... }
-        "Filename",
-        "FileName",
-        "filename",
-        "fileName",
-        "Url",
-        "URL",
-        "url",
-        "Src",
-        "SRC",
-        "src",
-        "Path",
-        "path",
-        "ImageUrl",
-        "ImageURL",
-        "ThumbUrl",
-        "ThumbURL",
-        "thumbUrl",
-        "thumbURL"
-    )
-    for (key in directKeys) {
-        val value = obj.get(key) ?: continue
-        val asString = value.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString
-        if (asString.isNullOrBlank()) continue
-
-        // If we were given a filename, mirror the website convention.
-        if (key.equals("Filename", ignoreCase = true) || key.equals("FileName", ignoreCase = true)) {
-            val trimmed = asString.trim()
-            if (trimmed.isBlank()) continue
-            return if (trimmed.startsWith("/")) trimmed else "/static/word_pictures/$trimmed"
-        }
-
-        return asString
-    }
-
-    // Fallback: find the first string value that looks like a URL/path.
-    for ((_, value) in obj.entrySet()) {
-        val asString = value.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString ?: continue
-        val trimmed = asString.trim()
-        if (
-            trimmed.startsWith("http://", ignoreCase = true) ||
-            trimmed.startsWith("https://", ignoreCase = true) ||
-            trimmed.startsWith("//") ||
-            trimmed.startsWith("/")
-        ) {
-            return trimmed
-        }
-    }
-
-    return null
-}
-
-private fun forceRtlText(text: String): String = "\u202B$text\u202C"
-
-private fun normalizeExampleText(raw: String): String {
-    if (raw.isBlank()) return ""
-    return raw
-        .trim()
-        .replace(Regex("""^[\s\u3002\uFF01\uFF1F\u30FB\u2022\u25E6\u25CF!?,.;:]+"""), "")
-        .replace(Regex("""\s+"""), " ")
-}
-
-@Composable
-private fun ModeBadge(useOfflineMode: Boolean) {
-    val label = if (useOfflineMode) "\u063a\u064a\u0631 \u0645\u062a\u0635\u0644" else "\u0645\u062a\u0635\u0644"
-    val bgColor = if (useOfflineMode) {
-        MaterialTheme.colorScheme.errorContainer
-    } else {
-        MaterialTheme.colorScheme.secondaryContainer
-    }
-    val fgColor = if (useOfflineMode) {
-        MaterialTheme.colorScheme.onErrorContainer
-    } else {
-        MaterialTheme.colorScheme.onSecondaryContainer
-    }
-    Surface(
-        color = bgColor,
-        shape = RoundedCornerShape(999.dp)
-    ) {
-        Text(
-            text = label,
-            color = fgColor,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-        )
-    }
-}
-private fun commonnessStars(difficulty: Int): String {
-    if (difficulty !in 1..5) return ""
-    return buildString(5) {
-        repeat(difficulty) { append('\u2605') }
-        repeat(5 - difficulty) { append('\u2606') }
-    }
-}
-
-@Composable
-private fun CommonnessBadge(
-    difficulty: Int,
-    modifier: Modifier = Modifier
-) {
-    val stars = commonnessStars(difficulty)
-    if (stars.isEmpty()) return
-
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer
-    ) {
-        Text(
-            text = "\u0627\u0644\u0634\u064a\u0648\u0639 $stars",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-        )
-    }
-}
-
-private fun formatOfflineSearchPreview(raw: String): String {
-    return normalizeMeaningText(raw)
-        .replace("\n", " ")
-        .replace(Regex("""\s{2,}"""), " ")
-        .trim()
-}
-
-private fun formatEpochAsLocal(epochMs: Long): String {
-    return runCatching {
-        DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-            .format(Date(epochMs))
-    }.getOrDefault("-")
-}
-private const val RELATED_WORDS_PAGE_SIZE = 5
-
-private data class MeaningEntry(
-    val definition: String,
-    val note: String
-)
-
-
-private fun formatMeaningEntries(meanings: List<Meaning>?): List<MeaningEntry> {
-    if (meanings.isNullOrEmpty()) return emptyList()
-    return meanings.mapNotNull { meaning ->
-        val definition = normalizeMeaningText(meaning.arabic)
-        val note = normalizeMeaningNote(meaning.note)
-        if (definition.isEmpty() && note.isEmpty()) {
-            null
-        } else {
-            MeaningEntry(
-                definition = if (definition.isNotEmpty()) definition else "-",
-                note = note
-            )
-        }
-    }
-}
-
-@Composable
-private fun DetailWordHeaderCard(
-    kanji: String,
-    kana: String,
-    chips: List<CategoryChipModel>,
-    onSpeakKana: () -> Unit,
-    onCategoryClick: (CategoryChipModel) -> Unit,
-    onKanjiClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = kana,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                IconButton(onClick = onSpeakKana) {
-                    Icon(
-                        imageVector = Icons.Default.VolumeUp,
-                        contentDescription = "Read kana"
+                    )
+                    Screen.Bookmarks -> BookmarksScreenContent(
+                        viewModel = viewModel,
+                        uiState = viewModel.bookmarksUiState,
+                        bookmarkFlow = viewModel.bookmarkPagingFlow,
+                        onGoBack = viewModel::goBack
+                    )
+                    Screen.Settings -> SettingsScreenContent(
+                        appVersionLabel = appVersionLabel,
+                        supportsDynamicColor = supportsDynamicColor,
+                        uiState = viewModel.settingsUiState,
+                        viewModel = viewModel,
+                        onGoBack = viewModel::goBack
+                    )
+                    Screen.Detail -> DetailScreenContent(
+                        useOfflineMode = settings.useOfflineMode,
+                        canSpeakJapanese = canSpeakJapanese,
+                        textToSpeech = textToSpeech,
+                        clipboardManager = clipboardManager,
+                        focusManager = focusManager,
+                        viewModel = viewModel
                     )
                 }
             }
-            Text(
-                text = kanji,
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.clickable(onClick = onKanjiClick)
-            )
-
-            if (chips.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .padding(top = 8.dp)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    chips.forEach { chip ->
-                        val isCategoryChip = chip.id >= 0
-                        val chipBgColor = if (isCategoryChip) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.secondaryContainer
-                        }
-                        val chipTextColor = if (isCategoryChip) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSecondaryContainer
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(999.dp),
-                            color = chipBgColor,
-                            modifier = if (isCategoryChip) {
-                                Modifier.clickable { onCategoryClick(chip) }
-                            } else {
-                                Modifier
-                            }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (isCategoryChip) {
-                                    Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = null,
-                                        tint = chipTextColor
-                                    )
-                                }
-                                Text(
-                                    text = chip.label,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = chipTextColor
-                                )
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 }
 
 @Composable
-private fun CategorySearchBanner(
-    label: String,
-    onClear: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "\u0627\u0644\u062a\u0635\u0646\u064a\u0641",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
-                )
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            TextButton(onClick = onClear) {
-                Text("\u0625\u0644\u063a\u0627\u0621")
-            }
-        }
-    }
-}
-
-@Composable
-private fun DefinitionsCard(
-    title: String,
-    definition: String
-) {
-    var expanded by remember(definition) { mutableStateOf(false) }
-    val canExpand = definition.length > 260 || definition.count { it == '\n' } >= 4
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                SelectionContainer {
-                    Text(
-                        text = forceRtlText(definition),
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textDirection = TextDirection.Rtl
-                        ),
-                        textAlign = TextAlign.Right,
-                        maxLines = if (expanded) Int.MAX_VALUE else 6,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                if (canExpand) {
-                    TextButton(
-                        onClick = { expanded = !expanded },
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text(if (expanded) "\u0639\u0631\u0636 \u0623\u0642\u0644" else "\u0639\u0631\u0636 \u0627\u0644\u0645\u0632\u064a\u062f")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PicturesCard(
-    title: String,
-    imageUrls: List<String>
+@OptIn(ExperimentalMaterial3Api::class)
+private fun DetailScreenContent(
+    useOfflineMode: Boolean,
+    canSpeakJapanese: Boolean,
+    textToSpeech: TextToSpeech?,
+    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
+    focusManager: androidx.compose.ui.focus.FocusManager,
+    viewModel: ShinjikaiViewModel
 ) {
     val context = LocalContext.current
-    val visibleImages = remember(imageUrls) { imageUrls.filter { it.isNotBlank() }.distinct() }
-    if (visibleImages.isEmpty()) return
+    val detailState = viewModel.detailUiState
+    val item = detailState.selectedItem
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
-            )
-
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(
-                    12.dp,
-                    alignment = Alignment.CenterHorizontally
-                )
-            ) {
-                items(visibleImages) { url ->
-                    Card(
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                        modifier = Modifier
-                            .size(width = 240.dp, height = 170.dp)
-                            .clickable {
-                                runCatching {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                }
-                            }
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            SubcomposeAsyncImage(
-                                model = url,
-                                contentDescription = null,
-                                contentScale = ContentScale.Fit,
-                                alignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                when (painter.state) {
-                                    is coil.compose.AsyncImagePainter.State.Loading -> {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(18.dp),
-                                            strokeWidth = 2.dp
-                                        )
-                                    }
-                                    is coil.compose.AsyncImagePainter.State.Error -> {
-                                        Text(
-                                            text = "\u062a\u0639\u0630\u0651\u0631 \u0627\u0644\u062a\u062d\u0645\u064a\u0644",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
-                                        )
-                                    }
-                                    else -> SubcomposeAsyncImageContent()
-                                }
-                            }
-                        }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.detail_title))
+                        ModeBadge(useOfflineMode = useOfflineMode)
                     }
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun RelatedWordsCard(
-    title: String,
-    items: List<RelatedWordItem>,
-    onWordClick: (RelatedWordItem) -> Unit
-) {
-    var visibleCount by remember(items) {
-        mutableStateOf(RELATED_WORDS_PAGE_SIZE.coerceAtMost(items.size))
-    }
-    val visibleItems = items.take(visibleCount)
-    val canLoadMore = visibleCount < items.size
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    visibleItems.forEach { item ->
-                        val displayText = item.text.ifBlank { item.kana.ifBlank { "Word ${item.wordId}" } }
-                        Surface(
-                            shape = RoundedCornerShape(999.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.clickable { onWordClick(item) }
-                        ) {
-                            Text(
-                                text = displayText,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                            )
-                        }
+                },
+                navigationIcon = {
+                    IconButton(onClick = viewModel::goBack) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.nav_back))
                     }
-                }
-
-                if (canLoadMore) {
-                    TextButton(
-                        onClick = {
-                            visibleCount = (visibleCount + RELATED_WORDS_PAGE_SIZE)
-                                .coerceAtMost(items.size)
-                        },
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text("\u0639\u0631\u0636 \u0627\u0644\u0645\u0632\u064a\u062f")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ExamplesCard(
-    title: String,
-    items: List<SentenceExample>
-) {
-    var expanded by remember(items) { mutableStateOf(false) }
-    val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = if (expanded) "\u0637\u064a \u0627\u0644\u0628\u0637\u0627\u0642\u0629" else "\u0639\u0631\u0636 ${items.size}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            if (expanded) {
-                FlowRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items.forEach { item ->
-                        val displayText = normalizeExampleText(item.text)
-                            .ifBlank { normalizeExampleText(item.kana) }
-                            .ifBlank { "\u0645\u062b\u0627\u0644" }
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.End,
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(999.dp),
-                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                modifier = Modifier.clickable {
-                                    clipboardManager.setText(AnnotatedString(displayText))
-                                    Toast.makeText(
-                                        context,
-                                        "\u062a\u0645 \u0646\u0633\u062e \u0627\u0644\u0645\u062b\u0627\u0644",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                            ) {
-                                Text(
-                                    text = displayText,
-                                    style = MaterialTheme.typography.labelLarge.copy(
-                                        textDirection = TextDirection.ContentOrLtr
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    textAlign = TextAlign.Start,
-                                    // Allow long Japanese examples to wrap to multiple lines.
-                                    maxLines = Int.MAX_VALUE,
-                                    softWrap = true,
-                                    overflow = TextOverflow.Clip,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                                )
-                            }
-                            if (item.arabic.isNotBlank()) {
-                                Text(
-                                    text = forceRtlText(item.arabic),
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        textDirection = TextDirection.Rtl
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Right,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-@Composable
-private fun DetailSectionCard(
-    title: String,
-    value: String,
-    valueStyle: androidx.compose.ui.text.TextStyle,
-    textAlign: TextAlign = TextAlign.Start,
-    valueWeight: FontWeight? = null,
-    contentModifier: Modifier = Modifier,
-    valueAnnotated: AnnotatedString? = null,
-    onWordIdClick: ((Int) -> Unit)? = null,
-    selectable: Boolean = false
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            if (selectable) {
-                SelectionContainer {
-                    Text(
-                        text = value,
-                        style = valueStyle,
-                        fontWeight = valueWeight,
-                        textAlign = textAlign,
-                        modifier = contentModifier
-                    )
-                }
-            } else if (valueAnnotated != null && onWordIdClick != null) {
-                ClickableText(
-                    text = valueAnnotated,
-                    style = valueStyle.copy(
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = valueWeight,
-                        textAlign = textAlign
-                    ),
-                    modifier = contentModifier,
-                    onClick = { offset ->
-                        val annotations = valueAnnotated.getStringAnnotations(
-                            tag = "word_id",
-                            start = offset,
-                            end = offset
+                },
+                actions = {
+                    IconButton(onClick = { item?.let(viewModel::toggleBookmark) }) {
+                        Icon(
+                            imageVector = if (detailState.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                            contentDescription = stringResource(R.string.nav_bookmarks)
                         )
-                        val targetId = annotations.firstOrNull()?.item?.toIntOrNull()
-                        if (targetId != null) onWordIdClick(targetId)
                     }
-                )
-            } else {
-                Text(
-                    text = value,
-                    style = valueStyle,
-                    fontWeight = valueWeight,
-                    textAlign = textAlign,
-                    modifier = contentModifier
-                )
-            }
+                }
+            )
         }
+    ) { padding ->
+        DetailScreenBody(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            useOfflineMode = useOfflineMode,
+            detailState = detailState,
+            canSpeakJapanese = canSpeakJapanese,
+            textToSpeech = textToSpeech,
+            context = context,
+            clipboardManager = clipboardManager,
+            focusManager = focusManager,
+            viewModel = viewModel
+        )
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
