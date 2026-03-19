@@ -27,6 +27,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -81,6 +82,7 @@ fun SearchScreenContent(
     val lazyResults = searchResults.collectAsLazyPagingItems()
     val searchFocusRequester = remember { FocusRequester() }
     var isSearchFieldFocused by remember { mutableStateOf(false) }
+    var showOfflineDownloadPrompt by remember { mutableStateOf(false) }
 
     val historyItems = if (uiState.term.isBlank()) {
         uiState.recentSearches
@@ -186,7 +188,7 @@ fun SearchScreenContent(
                     hasOfflineDictionary = hasOfflineDictionary,
                     onModeSelected = { selectedOffline ->
                         if (selectedOffline && !hasOfflineDictionary) {
-                            onNavigateTo(Screen.Settings)
+                            showOfflineDownloadPrompt = true
                         } else if (selectedOffline != useOfflineMode) {
                             viewModel.setUseOfflineMode(selectedOffline)
                         }
@@ -194,7 +196,7 @@ fun SearchScreenContent(
                 )
             }
 
-            if (isSearchFieldFocused && historyItems.isNotEmpty() && (!hasActiveSearch || lazyResults.itemCount == 0) && !isRefreshing) {
+            if (isSearchFieldFocused && historyItems.isNotEmpty() && !isRefreshing) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
@@ -372,6 +374,29 @@ fun SearchScreenContent(
                 }
             }
         }
+    }
+
+    if (showOfflineDownloadPrompt) {
+        AlertDialog(
+            onDismissRequest = { showOfflineDownloadPrompt = false },
+            title = { Text(stringResource(R.string.offline_download_prompt_title)) },
+            text = { Text(stringResource(R.string.offline_download_prompt_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showOfflineDownloadPrompt = false
+                        onNavigateTo(Screen.Settings)
+                    }
+                ) {
+                    Text(stringResource(R.string.offline_download_prompt_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOfflineDownloadPrompt = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
     }
 }
 
