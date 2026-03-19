@@ -14,10 +14,12 @@
     <string name="detail_examples_title">الأمثلة</string>
     <string name="detail_note_prefix">ملاحظة:</string>
     <string name="detail_no_reading">لا توجد قراءة</string>
+    <string name="detail_pronounce">نطق</string>
     <string name="detail_japanese_audio_unavailable">الصوت الياباني غير متاح حالياً</string>
     <string name="detail_word_copied">تم نسخ الكلمة</string>
     <string name="detail_example_copied">تم نسخ المثال</string>
     <string name="detail_example_fallback">مثال</string>
+    <string name="detail_word_fallback">كلمة %1$d</string>
     <string name="detail_image_load_error">تعذّر التحميل</string>
     <string name="detail_retry">إعادة المحاولة</string>
     <string name="detail_show_more">عرض المزيد</string>
@@ -54,7 +56,7 @@
     <string name="settings_loading_inline">جاري التحميل...</string>
     <string name="settings_download_local_dictionary">تحميل القاموس المحلي</string>
     <string name="settings_github">GitHub</string>
-    <string name="settings_open_github">Open GitHub</string>
+    <string name="settings_open_github">فتح GitHub</string>
 
     <string name="mode_online">متصل</string>
     <string name="mode_offline">غير متصل</string>

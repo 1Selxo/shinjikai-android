@@ -188,6 +188,7 @@ fun ShinjikaiApp(
                     Screen.Search -> SearchScreenContent(
                         appName = appName,
                         useOfflineMode = settings.useOfflineMode,
+                        hasOfflineDictionary = viewModel.settingsUiState.offlineTermCount > 0,
                         viewModel = viewModel,
                         uiState = viewModel.searchUiState,
                         searchResults = viewModel.searchResults,
@@ -241,12 +242,7 @@ private fun DetailScreenContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.detail_title))
-                        ModeBadge(useOfflineMode = useOfflineMode)
-                    }
-                },
+                title = { Text(stringResource(R.string.detail_title)) },
                 navigationIcon = {
                     IconButton(onClick = viewModel::goBack) {
                         Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.nav_back))

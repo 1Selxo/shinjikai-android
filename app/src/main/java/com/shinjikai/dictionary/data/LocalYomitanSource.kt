@@ -149,7 +149,7 @@ class LocalYomitanSource(
     override suspend fun loadCategory(id: Int, page: Int): Result<LoadCategoryResponse> {
         return Result.success(
             LoadCategoryResponse(
-                category = CategoryRef(id = id, name = "Local Category"),
+                category = CategoryRef(id = id, name = "تصنيف محلي"),
                 members = SearchWordsResponse()
             )
         )
