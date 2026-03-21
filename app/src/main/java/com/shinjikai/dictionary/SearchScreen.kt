@@ -329,7 +329,11 @@ fun SearchScreenContent(
                                     }
                                     Text(
                                         text = forceRtlText(
-                                            if (useOfflineMode) formatOfflineSearchPreview(item.meaningSummary) else item.meaningSummary
+                                            if (useOfflineMode) {
+                                                formatOfflineSearchPreview(item.meaningSummary)
+                                            } else {
+                                                formatOnlineSearchPreview(item.meaningSummary)
+                                            }
                                         ),
                                         style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Rtl),
                                         textAlign = TextAlign.Right,

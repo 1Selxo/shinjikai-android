@@ -344,6 +344,24 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         openDetails(SearchItem(id = id))
     }
 
+    fun openOnlineGlossaryReference(id: Int) {
+        if (id <= 0) return
+        detailsLoadJob?.cancel()
+        detailsOpenedFromBookmarks = false
+        selectedItem = SearchItem(id = id)
+        details = null
+        detailsError = null
+        loadingDetails = true
+
+        detailsLoadJob = viewModelScope.launch {
+            ensureCategoriesPreloadedIfNeeded()
+            val result = repository.loadWordDetails(id)
+            loadingDetails = false
+            result.onSuccess { details = it }
+                .onFailure { detailsError = it.message ?: context.getString(R.string.error_details_load) }
+        }
+    }
+
     fun openDetailsByRelatedItem(relatedItem: RelatedWordItem) {
         if (relatedItem.wordId > 0) {
             openDetailsById(relatedItem.wordId)

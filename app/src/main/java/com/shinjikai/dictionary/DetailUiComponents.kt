@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -68,6 +67,8 @@ import java.util.Date
 
 private data class CategoryChipModel(val id: Int, val label: String)
 private data class MeaningEntry(val definition: String, val note: String)
+private data class GlossaryReference(val id: Int, val label: String)
+private data class DefinitionContent(val text: String, val references: List<GlossaryReference>)
 
 private const val RELATED_WORDS_PAGE_SIZE = 5
 private val MEANING_BULLET_PREFIX_REGEX =
@@ -75,6 +76,14 @@ private val MEANING_BULLET_PREFIX_REGEX =
 private val MEANING_MULTISPACE_REGEX = Regex("""[ \t]{2,}""")
 private val MEANING_EMPTY_BRACES_REGEX = Regex("""\{\s*\}""")
 private val MEANING_TRAILING_SPACES_REGEX = Regex("""(?m)^\s+$""")
+private val MEANING_CONTROL_MARKS_REGEX = Regex("""[\u200E\u200F\u202A-\u202E\u2066-\u2069]""")
+private val MEANING_ARABIC_SEMICOLON_REGEX = Regex("""\s*؛\s*""")
+private val MEANING_PAREN_BAR_REGEX = Regex("""\(\|\s*(.*?)\s*\|\)""")
+private val MEANING_INLINE_TAG_REGEX =
+    Regex("""\[\{\s*([^:{}\[\]]+)\s*:\s*([^{}\[\]]+)\s*\}\]|\{\s*([^:{}\[\]]+)\s*:\s*([^{}\[\]]+)\s*\}""")
+private val GLOSSARY_REFERENCE_REGEX = Regex("""\{([^:{}]+):(\d+)\}""")
+private val JAPANESE_NUMERIC_REFERENCE_REGEX =
+    Regex("""([\p{IsHan}\p{IsHiragana}\p{IsKatakana}ー々ヶ]+)\s*:\s*\d+""")
 private val API_IMAGE_FILENAME_REGEX = Regex("""(?i)^[^/\\?#]+\.(png|jpe?g|webp|gif|bmp|svg)$""")
 
 @Composable
@@ -118,11 +127,31 @@ fun DetailScreenBody(
             .orEmpty()
             .ifBlank { item.primaryWriting.ifBlank { "-" } }
         val kana = detailState.details?.word?.kana.orEmpty().ifBlank { item.kana.ifBlank { "-" } }
-        val definitionChunk = formatDefinition(
+        val definitionContent = formatDefinition(
             meanings = detailState.details?.word?.meanings,
-            notePrefix = stringResource(R.string.detail_note_prefix)
-        )
-            .ifBlank { item.meaningSummary.ifBlank { "-" } }
+            notePrefix = stringResource(R.string.detail_note_prefix),
+            enableGlossaryLinks = !useOfflineMode
+        ).takeIf { it.text.isNotBlank() }
+            ?: run {
+                if (useOfflineMode) {
+                    DefinitionContent(
+                        text = item.meaningSummary.ifBlank { "-" },
+                        references = emptyList()
+                    )
+                } else {
+                    val fallbackReferences = linkedMapOf<Int, GlossaryReference>()
+                    val fallbackText = stripGlossaryReferences(
+                        raw = normalizeMeaningText(item.meaningSummary),
+                        enableGlossaryLinks = true,
+                        references = fallbackReferences
+                    ).replace("\n", " ").replace(Regex("""\s{2,}"""), " ").trim()
+
+                    DefinitionContent(
+                        text = fallbackText.ifBlank { "-" },
+                        references = fallbackReferences.values.toList()
+                    )
+                }
+            }
         val jlptLevel = detailState.details?.word?.jlpt?.takeIf { it in 1..5 } ?: item.jlpt.takeIf { it in 1..5 }
         val commonnessLevel = detailState.details?.word?.difficulty?.takeIf { it in 1..5 }
             ?: item.difficulty.takeIf { it in 1..5 }
@@ -177,7 +206,16 @@ fun DetailScreenBody(
             }
         )
 
-        DefinitionsCard(title = stringResource(R.string.detail_definitions_title), definition = definitionChunk)
+        DefinitionsCard(
+            title = stringResource(R.string.detail_definitions_title),
+            content = definitionContent,
+            onGlossaryReferenceClick = { referenceId ->
+                if (!useOfflineMode) {
+                    focusManager.clearFocus()
+                    viewModel.openOnlineGlossaryReference(referenceId)
+                }
+            }
+        )
 
         val pictureUrls = detailState.details?.word?.meanings.orEmpty()
             .flatMap(::extractMeaningPictureUrls)
@@ -249,6 +287,19 @@ private fun DetailStateCard(title: String, message: String, actionLabel: String,
 
 private fun normalizeMeaningText(raw: String): String = raw.trim()
     .replace("$", "")
+    .replace(MEANING_CONTROL_MARKS_REGEX, "")
+    .replace(MEANING_ARABIC_SEMICOLON_REGEX, " ")
+    .replace(MEANING_PAREN_BAR_REGEX, "( $1 )")
+    .replace(MEANING_INLINE_TAG_REGEX) { match ->
+        val label = (match.groups[1]?.value ?: match.groups[3]?.value).orEmpty().trim()
+        val value = (match.groups[2]?.value ?: match.groups[4]?.value).orEmpty().trim()
+        if (label.isEmpty() || value.all(Char::isDigit)) match.value else "$label:"
+    }
+    .replace(Regex("""\{\s*([^:{}][^{}]*?)\s*\}""")) { match ->
+        val label = match.groupValues[1].trim()
+        if (label.isEmpty()) "" else "$label:"
+    }
+    .replace(JAPANESE_NUMERIC_REFERENCE_REGEX, "$1")
     .replace(MEANING_BULLET_PREFIX_REGEX, "")
     .replace(MEANING_EMPTY_BRACES_REGEX, "")
     .replace(MEANING_TRAILING_SPACES_REGEX, "")
@@ -260,18 +311,28 @@ private fun normalizeMeaningNote(raw: String): String {
     return cleaned.takeUnless { it.equals("no", true) || it == "-" }.orEmpty()
 }
 
-private fun formatDefinition(meanings: List<Meaning>?, notePrefix: String): String {
-    return formatMeaningEntries(meanings).joinToString("\n\n") { entry ->
+private fun formatDefinition(
+    meanings: List<Meaning>?,
+    notePrefix: String,
+    enableGlossaryLinks: Boolean
+): DefinitionContent {
+    val entries = formatMeaningEntries(meanings)
+    if (entries.isEmpty()) return DefinitionContent(text = "", references = emptyList())
+
+    val references = linkedMapOf<Int, GlossaryReference>()
+    val text = entries.joinToString("\n\n") { entry ->
         buildString {
-            append("• ")
-            append(entry.definition)
+            append("- ")
+            append(stripGlossaryReferences(entry.definition, enableGlossaryLinks, references))
             if (entry.note.isNotBlank()) {
                 append("\n")
                 append(notePrefix)
-                append(entry.note)
+                append(stripGlossaryReferences(entry.note, enableGlossaryLinks, references))
             }
         }
-    }.trim()
+    }
+
+    return DefinitionContent(text = text, references = references.values.toList())
 }
 
 private fun formatMeaningEntries(meanings: List<Meaning>?): List<MeaningEntry> {
@@ -328,6 +389,14 @@ internal fun forceRtlText(text: String): String = "\u202B$text\u202C"
 
 internal fun formatOfflineSearchPreview(raw: String): String {
     return normalizeMeaningText(raw).replace("\n", " ").replace(Regex("""\s{2,}"""), " ").trim()
+}
+
+internal fun formatOnlineSearchPreview(raw: String): String {
+    return normalizeMeaningText(raw)
+        .replace(GLOSSARY_REFERENCE_REGEX) { match -> match.groupValues[1].trim() }
+        .replace("\n", " ")
+        .replace(Regex("""\s{2,}"""), " ")
+        .trim()
 }
 
 internal fun formatEpochAsLocal(epochMs: Long): String {
@@ -457,8 +526,14 @@ private fun DetailWordHeaderCard(
 }
 
 @Composable
-private fun DefinitionsCard(title: String, definition: String) {
-    var expanded by remember(definition) { mutableStateOf(false) }
+@OptIn(ExperimentalLayoutApi::class)
+private fun DefinitionsCard(
+    title: String,
+    content: DefinitionContent,
+    onGlossaryReferenceClick: (Int) -> Unit
+) {
+    var expanded by remember(content.text) { mutableStateOf(false) }
+    val definition = content.text
     val canExpand = definition.length > 260 || definition.count { it == '\n' } >= 4
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -470,12 +545,37 @@ private fun DefinitionsCard(title: String, definition: String) {
             SelectionContainer {
                 Text(
                     text = forceRtlText(definition),
-                    style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Rtl),
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textDirection = TextDirection.Rtl
+                    ),
                     textAlign = TextAlign.Right,
                     maxLines = if (expanded) Int.MAX_VALUE else 6,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 )
+            }
+            if (content.references.isNotEmpty()) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    content.references.forEach { reference ->
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.clickable { onGlossaryReferenceClick(reference.id) }
+                        ) {
+                            Text(
+                                text = reference.label,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
             }
             if (canExpand) {
                 TextButton(onClick = { expanded = !expanded }, modifier = Modifier.align(Alignment.End)) {
@@ -484,6 +584,38 @@ private fun DefinitionsCard(title: String, definition: String) {
             }
         }
     }
+}
+
+private fun stripGlossaryReferences(
+    raw: String,
+    enableGlossaryLinks: Boolean,
+    references: MutableMap<Int, GlossaryReference>
+): String {
+    if (!enableGlossaryLinks) {
+        return raw
+    }
+
+    val result = StringBuilder()
+    var cursor = 0
+    for (match in GLOSSARY_REFERENCE_REGEX.findAll(raw)) {
+        val range = match.range
+        if (cursor < range.first) {
+            result.append(raw.substring(cursor, range.first))
+        }
+        val label = match.groupValues[1].trim()
+        val id = match.groupValues[2].toIntOrNull()
+        if (!label.isNullOrEmpty()) {
+            result.append(label)
+            if (id != null && id > 0) {
+                references.putIfAbsent(id, GlossaryReference(id = id, label = label))
+            }
+        }
+        cursor = range.last + 1
+    }
+    if (cursor < raw.length) {
+        result.append(raw.substring(cursor))
+    }
+    return result.toString()
 }
 
 @Composable
