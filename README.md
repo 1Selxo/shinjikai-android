@@ -1,5 +1,7 @@
 # 📘 Shinjikai Android Dictionary
 
+[![GitHub all releases downloads](https://img.shields.io/github/downloads/obj44/shinjikai/total)](https://github.com/obj44/shinjikai/releases)
+
 Android app (Kotlin + Jetpack Compose) for Japanese → Arabic dictionary lookup using the Shinjikai API:  
 `https://shinjikai.app`
 

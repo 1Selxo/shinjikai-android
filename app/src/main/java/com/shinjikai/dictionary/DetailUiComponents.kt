@@ -71,6 +71,7 @@ private data class GlossaryReference(val id: Int, val label: String)
 private data class DefinitionContent(val text: String, val references: List<GlossaryReference>)
 
 private const val RELATED_WORDS_PAGE_SIZE = 5
+private const val EXAMPLES_PAGE_SIZE = 3
 private val MEANING_BULLET_PREFIX_REGEX =
     Regex("(?m)^\\s*[\\uD83D\\uDD39\\u25AA\\u2022\\u25CF\\u25E6]\\s*")
 private val MEANING_MULTISPACE_REGEX = Regex("""[ \t]{2,}""")
@@ -725,7 +726,8 @@ private fun RelatedWordsCard(title: String, items: List<RelatedWordItem>, onWord
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 private fun ExamplesCard(title: String, items: List<SentenceExample>) {
-    var expanded by remember(items) { mutableStateOf(false) }
+    var expanded by remember(items) { mutableStateOf(true) }
+    var visibleCount by remember(items) { mutableStateOf(EXAMPLES_PAGE_SIZE.coerceAtMost(items.size)) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
     val exampleFallback = stringResource(R.string.detail_example_fallback)
@@ -737,7 +739,7 @@ private fun ExamplesCard(title: String, items: List<SentenceExample>) {
     ) {
         Column {
             Row(
-                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(horizontal = 16.dp, vertical = 14.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -746,23 +748,13 @@ private fun ExamplesCard(title: String, items: List<SentenceExample>) {
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Text(
-                    text = if (expanded) {
-                        stringResource(R.string.detail_card_collapse)
-                    } else {
-                        stringResource(R.string.detail_card_show_count, items.size)
-                    },
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelLarge
-                )
             }
             if (expanded) {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items.forEach { item ->
+                    items.take(visibleCount).forEach { item ->
                         val displayText = item.text.ifBlank { item.kana.ifBlank { exampleFallback } }
                         Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
                             Surface(
@@ -789,6 +781,35 @@ private fun ExamplesCard(title: String, items: List<SentenceExample>) {
                                 )
                             }
                         }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (visibleCount < items.size) {
+                            TextButton(
+                                onClick = {
+                                    visibleCount = (visibleCount + EXAMPLES_PAGE_SIZE).coerceAtMost(items.size)
+                                }
+                            ) {
+                                Text(stringResource(R.string.detail_show_more))
+                            }
+                        } else {
+                            Spacer(modifier = Modifier)
+                        }
+                        TextButton(onClick = { expanded = false }) {
+                            Text(stringResource(R.string.detail_card_collapse))
+                        }
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = { expanded = true }) {
+                        Text(stringResource(R.string.detail_show_more))
                     }
                 }
             }
