@@ -23,6 +23,7 @@ class SettingsStore(
         val DARK_MODE = booleanPreferencesKey("dark_mode")
         val USE_DYNAMIC_COLOR = booleanPreferencesKey("use_dynamic_color")
         val USE_OFFLINE_MODE = booleanPreferencesKey("use_offline_mode")
+        val HAS_SEEN_INTRODUCTION = booleanPreferencesKey("has_seen_introduction")
     }
 
     /**
@@ -33,7 +34,8 @@ class SettingsStore(
         return AppSettings(
             darkMode = cachePrefs.getBoolean("dark_mode", false),
             useDynamicColor = cachePrefs.getBoolean("use_dynamic_color", true),
-            useOfflineMode = cachePrefs.getBoolean("use_offline_mode", false)
+            useOfflineMode = cachePrefs.getBoolean("use_offline_mode", false),
+            hasSeenIntroduction = cachePrefs.getBoolean("has_seen_introduction", false)
         )
     }
 
@@ -47,7 +49,8 @@ class SettingsStore(
             AppSettings(
                 darkMode = prefs[Keys.DARK_MODE] ?: false,
                 useDynamicColor = prefs[Keys.USE_DYNAMIC_COLOR] ?: true,
-                useOfflineMode = prefs[Keys.USE_OFFLINE_MODE] ?: false
+                useOfflineMode = prefs[Keys.USE_OFFLINE_MODE] ?: false,
+                hasSeenIntroduction = prefs[Keys.HAS_SEEN_INTRODUCTION] ?: false
             )
         }
         .onEach { settings ->
@@ -56,6 +59,7 @@ class SettingsStore(
                 .putBoolean("dark_mode", settings.darkMode)
                 .putBoolean("use_dynamic_color", settings.useDynamicColor)
                 .putBoolean("use_offline_mode", settings.useOfflineMode)
+                .putBoolean("has_seen_introduction", settings.hasSeenIntroduction)
                 .apply()
         }
 
@@ -72,5 +76,10 @@ class SettingsStore(
     suspend fun setUseOfflineMode(enabled: Boolean) {
         context.settingsDataStore.edit { prefs -> prefs[Keys.USE_OFFLINE_MODE] = enabled }
         cachePrefs.edit().putBoolean("use_offline_mode", enabled).apply()
+    }
+
+    suspend fun setHasSeenIntroduction(seen: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[Keys.HAS_SEEN_INTRODUCTION] = seen }
+        cachePrefs.edit().putBoolean("has_seen_introduction", seen).apply()
     }
 }

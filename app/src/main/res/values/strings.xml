@@ -33,6 +33,20 @@
     <string name="search_hint">اكتب باليابانية أو العربية أو بالرومـاجي</string>
     <string name="search_clear_history">مسح سجل البحث</string>
     <string name="search_no_results">لا توجد نتائج</string>
+    <string name="intro_title">ابدأ مع شِنجِكاي</string>
+    <string name="intro_page_1_eyebrow">الخطوة 1</string>
+    <string name="intro_page_1_title">ابحث بالطريقة التي تناسبك</string>
+    <string name="intro_page_1_body">اكتب باليابانية أو بالعربية أو بالرومـاجي، ثم تنقّل بين النتائج بسرعة حتى تصل إلى الكلمة التي تريدها.</string>
+    <string name="intro_page_2_eyebrow">الخطوة 2</string>
+    <string name="intro_page_2_title">افتح التفاصيل واحفظ المهم</string>
+    <string name="intro_page_2_body">كل كلمة تفتح لك المعاني والأمثلة والكلمات ذات الصلة، ويمكنك حفظها في المحفوظات للرجوع إليها لاحقاً.</string>
+    <string name="intro_page_3_eyebrow">الخطوة 3</string>
+    <string name="intro_page_3_title">جهّز البحث بدون إنترنت</string>
+    <string name="intro_page_3_body">إذا أردت استخدام التطبيق بدون اتصال، افتح الإعدادات وحمّل القاموس المحلي مرة واحدة فقط.</string>
+    <string name="intro_action_next">التالي</string>
+    <string name="intro_action_start">ابدأ الآن</string>
+    <string name="intro_action_skip">تخطّ المقدمة</string>
+    <string name="intro_action_offline_setup">الذهاب إلى إعداد القاموس المحلي</string>
 
     <string name="bookmarks_title">المحفوظات</string>
     <string name="bookmarks_selected_count">%1$d محدد</string>

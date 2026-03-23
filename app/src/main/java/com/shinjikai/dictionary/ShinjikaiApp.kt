@@ -3,21 +3,40 @@ package com.shinjikai.dictionary
 import android.os.Build
 import android.speech.tts.TextToSpeech
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.DownloadForOffline
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.TipsAndUpdates
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,9 +54,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -46,12 +70,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shinjikai.dictionary.ui.Screen
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -184,46 +210,257 @@ fun ShinjikaiApp(
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
             BackHandler(enabled = screenStack.size > 1) { viewModel.goBack() }
             Surface(color = MaterialTheme.colorScheme.background) {
-                when (currentScreen) {
-                    Screen.Search -> SearchScreenContent(
+                if (viewModel.settingsUiState.showIntroduction) {
+                    IntroductionScreen(
                         appName = appName,
-                        useOfflineMode = settings.useOfflineMode,
-                        hasOfflineDictionary = viewModel.settingsUiState.offlineTermCount > 0,
-                        viewModel = viewModel,
-                        uiState = viewModel.searchUiState,
-                        searchResults = viewModel.searchResults,
-                        onNavigateTo = viewModel::navigateTo,
-                        onOpenDetails = {
-                            focusManager.clearFocus()
-                            viewModel.openDetails(it)
+                        onFinish = viewModel::dismissIntroduction,
+                        onOpenOfflineSetup = {
+                            viewModel.dismissIntroduction()
+                            viewModel.navigateTo(Screen.Settings)
                         }
                     )
-                    Screen.Bookmarks -> BookmarksScreenContent(
-                        viewModel = viewModel,
-                        uiState = viewModel.bookmarksUiState,
-                        bookmarkFlow = viewModel.bookmarkPagingFlow,
-                        onGoBack = viewModel::goBack
-                    )
-                    Screen.Settings -> SettingsScreenContent(
-                        appVersionLabel = appVersionLabel,
-                        supportsDynamicColor = supportsDynamicColor,
-                        uiState = viewModel.settingsUiState,
-                        viewModel = viewModel,
-                        onGoBack = viewModel::goBack
-                    )
-                    Screen.Detail -> DetailScreenContent(
-                        useOfflineMode = settings.useOfflineMode,
-                        canSpeakJapanese = canSpeakJapanese,
-                        textToSpeech = textToSpeech,
-                        clipboardManager = clipboardManager,
-                        focusManager = focusManager,
-                        viewModel = viewModel
-                    )
+                } else {
+                    when (currentScreen) {
+                        Screen.Search -> SearchScreenContent(
+                            appName = appName,
+                            useOfflineMode = settings.useOfflineMode,
+                            hasOfflineDictionary = viewModel.settingsUiState.offlineTermCount > 0,
+                            viewModel = viewModel,
+                            uiState = viewModel.searchUiState,
+                            searchResults = viewModel.searchResults,
+                            onNavigateTo = viewModel::navigateTo,
+                            onOpenDetails = {
+                                focusManager.clearFocus()
+                                viewModel.openDetails(it)
+                            }
+                        )
+                        Screen.Bookmarks -> BookmarksScreenContent(
+                            viewModel = viewModel,
+                            uiState = viewModel.bookmarksUiState,
+                            bookmarkFlow = viewModel.bookmarkPagingFlow,
+                            onGoBack = viewModel::goBack
+                        )
+                        Screen.Settings -> SettingsScreenContent(
+                            appVersionLabel = appVersionLabel,
+                            supportsDynamicColor = supportsDynamicColor,
+                            uiState = viewModel.settingsUiState,
+                            viewModel = viewModel,
+                            onGoBack = viewModel::goBack
+                        )
+                        Screen.Detail -> DetailScreenContent(
+                            useOfflineMode = settings.useOfflineMode,
+                            canSpeakJapanese = canSpeakJapanese,
+                            textToSpeech = textToSpeech,
+                            clipboardManager = clipboardManager,
+                            focusManager = focusManager,
+                            viewModel = viewModel
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+@Composable
+@OptIn(ExperimentalFoundationApi::class)
+private fun IntroductionScreen(
+    appName: String,
+    onFinish: () -> Unit,
+    onOpenOfflineSetup: () -> Unit
+) {
+    val onboardingPages = remember {
+        listOf(
+            OnboardingPage(
+                icon = Icons.Default.Search,
+                accent = listOf(Color(0xFF2A5EA8), Color(0xFF4EA1D3)),
+                eyebrowRes = R.string.intro_page_1_eyebrow,
+                titleRes = R.string.intro_page_1_title,
+                bodyRes = R.string.intro_page_1_body
+            ),
+            OnboardingPage(
+                icon = Icons.AutoMirrored.Filled.MenuBook,
+                accent = listOf(Color(0xFF00796B), Color(0xFF49B6A5)),
+                eyebrowRes = R.string.intro_page_2_eyebrow,
+                titleRes = R.string.intro_page_2_title,
+                bodyRes = R.string.intro_page_2_body
+            ),
+            OnboardingPage(
+                icon = Icons.Default.DownloadForOffline,
+                accent = listOf(Color(0xFF7B4DCC), Color(0xFFB786F8)),
+                eyebrowRes = R.string.intro_page_3_eyebrow,
+                titleRes = R.string.intro_page_3_title,
+                bodyRes = R.string.intro_page_3_body
+            )
+        )
+    }
+    val pagerState = rememberPagerState(pageCount = { onboardingPages.size })
+    val coroutineScope = rememberCoroutineScope()
+    val currentPage = pagerState.currentPage
+    val isLastPage = currentPage == onboardingPages.lastIndex
+
+    Scaffold { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 24.dp, vertical = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = appName, style = MaterialTheme.typography.displaySmall)
+            Text(
+                text = stringResource(R.string.intro_title),
+                style = MaterialTheme.typography.headlineMedium
+            )
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) { page ->
+                IntroPageCard(page = onboardingPages[page])
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                onboardingPages.forEachIndexed { index, _ ->
+                    val selected = index == currentPage
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .size(width = if (selected) 28.dp else 10.dp, height = 10.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceVariant
+                            )
+                    )
+                }
+            }
+
+            if (isLastPage) {
+                Button(
+                    onClick = onFinish,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.intro_action_start))
+                }
+                OutlinedButton(
+                    onClick = onOpenOfflineSetup,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.intro_action_offline_setup))
+                }
+            } else {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(currentPage + 1)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.intro_action_next))
+                }
+                OutlinedButton(
+                    onClick = onFinish,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.intro_action_skip))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IntroPageCard(
+    page: OnboardingPage
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(vertical = 6.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(22.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Brush.linearGradient(page.accent))
+                    .border(
+                        width = 1.dp,
+                        color = Color.White.copy(alpha = 0.18f),
+                        shape = RoundedCornerShape(24.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(84.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = page.icon,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.TipsAndUpdates,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.88f),
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = stringResource(page.eyebrowRes),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = stringResource(page.titleRes),
+                style = MaterialTheme.typography.headlineSmall
+            )
+            Text(
+                text = stringResource(page.bodyRes),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
+            )
+        }
+    }
+}
+
+private data class OnboardingPage(
+    val icon: ImageVector,
+    val accent: List<Color>,
+    val eyebrowRes: Int,
+    val titleRes: Int,
+    val bodyRes: Int
+)
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)

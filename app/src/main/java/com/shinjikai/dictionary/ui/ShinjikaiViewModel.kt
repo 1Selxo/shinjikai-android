@@ -173,6 +173,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     val settingsUiState: SettingsUiState
         get() = SettingsUiState(
             settings = settings.value,
+            showIntroduction = !settings.value.hasSeenIntroduction,
             isImportingOfflineData = isImportingOfflineData,
             offlineImportProgress = offlineImportProgress,
             offlineImportPhase = offlineImportPhase,
@@ -470,6 +471,11 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setUseOfflineMode(enabled: Boolean) {
         viewModelScope.launch { settingsStore.setUseOfflineMode(enabled) }
+    }
+
+    fun dismissIntroduction() {
+        if (settings.value.hasSeenIntroduction) return
+        viewModelScope.launch { settingsStore.setHasSeenIntroduction(true) }
     }
 
     fun refreshOfflineTermCount() {

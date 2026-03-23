@@ -33,6 +33,7 @@ data class BookmarksUiState(
 
 data class SettingsUiState(
     val settings: AppSettings = AppSettings(),
+    val showIntroduction: Boolean = true,
     val isImportingOfflineData: Boolean = false,
     val offlineImportProgress: Float = 0f,
     val offlineImportPhase: String? = null,
