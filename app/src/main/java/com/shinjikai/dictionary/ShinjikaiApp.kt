@@ -393,12 +393,12 @@ private fun IntroPageCard(
                 .fillMaxSize()
                 .padding(22.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp)
+                    .height(156.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .background(Brush.linearGradient(page.accent))
                     .border(
@@ -414,7 +414,7 @@ private fun IntroPageCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(84.dp)
+                            .size(64.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.16f)),
                         contentAlignment = Alignment.Center
@@ -423,7 +423,7 @@ private fun IntroPageCard(
                             imageVector = page.icon,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                 }
