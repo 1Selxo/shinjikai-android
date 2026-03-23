@@ -33,7 +33,8 @@
     <string name="search_hint">اكتب باليابانية أو العربية أو بالرومـاجي</string>
     <string name="search_clear_history">مسح سجل البحث</string>
     <string name="search_no_results">لا توجد نتائج</string>
-    <string name="intro_title">ابدأ مع شِنجِكاي</string>
+    <string name="intro_app_name">قاموس شِنجِكاي 深辞海</string>
+    <string name="intro_title">القاموس الياباني العربي الكبير</string>
     <string name="intro_page_1_eyebrow">الخطوة 1</string>
     <string name="intro_page_1_title">ابحث بالطريقة التي تناسبك</string>
     <string name="intro_page_1_body">اكتب باليابانية أو بالعربية أو بالرومـاجي، ثم تنقّل بين النتائج بسرعة حتى تصل إلى الكلمة التي تريدها.</string>
@@ -69,6 +70,9 @@
     <string name="settings_last_local_update">آخر تحديث محلي: %1$s</string>
     <string name="settings_loading_inline">جاري التحميل...</string>
     <string name="settings_download_local_dictionary">تحميل القاموس المحلي</string>
+    <string name="settings_onboarding_title">المقدمة</string>
+    <string name="settings_onboarding_description">إذا أردت مشاهدة الشرح التعريفي مرة أخرى، يمكنك فتحه من هنا في أي وقت.</string>
+    <string name="settings_onboarding_show_again">عرض المقدمة مرة أخرى</string>
     <string name="settings_github">GitHub</string>
     <string name="settings_open_github">فتح GitHub</string>
 

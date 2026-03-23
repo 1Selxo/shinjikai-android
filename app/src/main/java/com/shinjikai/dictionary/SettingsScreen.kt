@@ -185,6 +185,31 @@ fun SettingsScreenContent(
             }
 
             Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_onboarding_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_onboarding_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                    )
+                    TextButton(onClick = viewModel::showIntroductionAgain) {
+                        Text(stringResource(R.string.settings_onboarding_show_again))
+                    }
+                }
+            }
+
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {

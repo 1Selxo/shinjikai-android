@@ -478,6 +478,10 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setHasSeenIntroduction(true) }
     }
 
+    fun showIntroductionAgain() {
+        viewModelScope.launch { settingsStore.setHasSeenIntroduction(false) }
+    }
+
     fun refreshOfflineTermCount() {
         viewModelScope.launch {
             val (count, epochMs) = withContext(Dispatchers.IO) {

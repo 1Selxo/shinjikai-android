@@ -29,7 +29,6 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.TipsAndUpdates
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -212,7 +211,6 @@ fun ShinjikaiApp(
             Surface(color = MaterialTheme.colorScheme.background) {
                 if (viewModel.settingsUiState.showIntroduction) {
                     IntroductionScreen(
-                        appName = appName,
                         onFinish = viewModel::dismissIntroduction,
                         onOpenOfflineSetup = {
                             viewModel.dismissIntroduction()
@@ -265,7 +263,6 @@ fun ShinjikaiApp(
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 private fun IntroductionScreen(
-    appName: String,
     onFinish: () -> Unit,
     onOpenOfflineSetup: () -> Unit
 ) {
@@ -308,7 +305,10 @@ private fun IntroductionScreen(
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             Spacer(modifier = Modifier.height(4.dp))
-            Text(text = appName, style = MaterialTheme.typography.displaySmall)
+            Text(
+                text = stringResource(R.string.intro_app_name),
+                style = MaterialTheme.typography.displaySmall
+            )
             Text(
                 text = stringResource(R.string.intro_title),
                 style = MaterialTheme.typography.headlineMedium
@@ -410,7 +410,7 @@ private fun IntroPageCard(
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.Center
                 ) {
                     Box(
                         modifier = Modifier
@@ -426,12 +426,6 @@ private fun IntroPageCard(
                             modifier = Modifier.size(40.dp)
                         )
                     }
-                    Icon(
-                        imageVector = Icons.Default.TipsAndUpdates,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.88f),
-                        modifier = Modifier.size(26.dp)
-                    )
                 }
             }
 
