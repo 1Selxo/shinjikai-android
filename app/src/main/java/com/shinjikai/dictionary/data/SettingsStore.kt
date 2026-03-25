@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
+import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -18,6 +19,8 @@ class SettingsStore(
     private val context: Context
 ) {
     private val cachePrefs = context.getSharedPreferences("app_settings_cache", Context.MODE_PRIVATE)
+    private val introSeenFlagFile = File(context.noBackupFilesDir, "has_seen_introduction.flag")
+    private val isUpdatedInstall by lazy(LazyThreadSafetyMode.NONE) { hasAppBeenUpdatedSinceInstall() }
 
     private object Keys {
         val DARK_MODE = booleanPreferencesKey("dark_mode")
@@ -35,7 +38,9 @@ class SettingsStore(
             darkMode = cachePrefs.getBoolean("dark_mode", false),
             useDynamicColor = cachePrefs.getBoolean("use_dynamic_color", true),
             useOfflineMode = cachePrefs.getBoolean("use_offline_mode", false),
-            hasSeenIntroduction = cachePrefs.getBoolean("has_seen_introduction", false)
+            hasSeenIntroduction = resolveHasSeenIntroduction(
+                legacySeen = cachePrefs.getBoolean("has_seen_introduction", false)
+            )
         )
     }
 
@@ -50,7 +55,9 @@ class SettingsStore(
                 darkMode = prefs[Keys.DARK_MODE] ?: false,
                 useDynamicColor = prefs[Keys.USE_DYNAMIC_COLOR] ?: true,
                 useOfflineMode = prefs[Keys.USE_OFFLINE_MODE] ?: false,
-                hasSeenIntroduction = prefs[Keys.HAS_SEEN_INTRODUCTION] ?: false
+                hasSeenIntroduction = resolveHasSeenIntroduction(
+                    legacySeen = prefs[Keys.HAS_SEEN_INTRODUCTION] ?: false
+                )
             )
         }
         .onEach { settings ->
@@ -61,6 +68,7 @@ class SettingsStore(
                 .putBoolean("use_offline_mode", settings.useOfflineMode)
                 .putBoolean("has_seen_introduction", settings.hasSeenIntroduction)
                 .apply()
+            syncIntroductionMarker(settings.hasSeenIntroduction)
         }
 
     suspend fun setDarkMode(enabled: Boolean) {
@@ -81,5 +89,33 @@ class SettingsStore(
     suspend fun setHasSeenIntroduction(seen: Boolean) {
         context.settingsDataStore.edit { prefs -> prefs[Keys.HAS_SEEN_INTRODUCTION] = seen }
         cachePrefs.edit().putBoolean("has_seen_introduction", seen).apply()
+        syncIntroductionMarker(seen)
+    }
+
+    private fun resolveHasSeenIntroduction(legacySeen: Boolean): Boolean {
+        if (introSeenFlagFile.exists()) return true
+        if (isUpdatedInstall && legacySeen) {
+            syncIntroductionMarker(true)
+            return true
+        }
+        return false
+    }
+
+    private fun syncIntroductionMarker(seen: Boolean) {
+        if (seen) {
+            introSeenFlagFile.parentFile?.mkdirs()
+            if (!introSeenFlagFile.exists()) {
+                introSeenFlagFile.writeText("1")
+            }
+        } else {
+            if (introSeenFlagFile.exists()) {
+                introSeenFlagFile.delete()
+            }
+        }
+    }
+
+    private fun hasAppBeenUpdatedSinceInstall(): Boolean {
+        val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+        return packageInfo.lastUpdateTime > packageInfo.firstInstallTime
     }
 }

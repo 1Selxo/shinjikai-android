@@ -73,7 +73,10 @@
     <string name="settings_onboarding_title">المقدمة</string>
     <string name="settings_onboarding_description">إذا أردت مشاهدة الشرح التعريفي مرة أخرى، يمكنك فتحه من هنا في أي وقت.</string>
     <string name="settings_onboarding_show_again">عرض المقدمة مرة أخرى</string>
-    <string name="settings_github">GitHub</string>
+    <string name="settings_about_title">&#x0639;&#x0646; &#x0627;&#x0644;&#x062A;&#x0637;&#x0628;&#x064A;&#x0642;</string>
+    <string name="settings_about_version">&#x0631;&#x0642;&#x0645; &#x0627;&#x0644;&#x0625;&#x0635;&#x062F;&#x0627;&#x0631;</string>
+    <string name="settings_about_source_description">&#x0627;&#x0637;&#x0644;&#x0639; &#x0639;&#x0644;&#x0649; &#x0645;&#x0635;&#x062F;&#x0631; &#x0627;&#x0644;&#x062A;&#x0637;&#x0628;&#x064A;&#x0642; &#x0639;&#x0644;&#x0649; GitHub.</string>
+    <string name="settings_github">الكود المصدري</string>
     <string name="settings_open_github">فتح GitHub</string>
 
     <string name="mode_online">متصل</string>
@@ -83,7 +86,7 @@
     <string name="error_bookmark_not_available_offline">هذه الكلمة غير محفوظة بدون إنترنت. احذفها من المحفوظات ثم أضفها مرة أخرى أثناء الاتصال.</string>
     <string name="error_bookmark_save">تعذّر حفظ الكلمة في المحفوظات.</string>
 
-    <string name="offline_import_phase_download">جاري تنزيل ملف القاموس...</string>
+    <string name="offline_import_phase_download">جاري تنزيل ملفات القاموس...</string>
     <string name="offline_import_phase_index">جاري فهرسة القاموس المحلي...</string>
     <string name="offline_import_success">تم تحميل %1$d كلمة للاستخدام بدون إنترنت.</string>
     <string name="offline_import_failure">فشل تحميل القاموس المحلي.</string>

@@ -5,7 +5,6 @@ import android.speech.tts.TextToSpeech
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -58,7 +57,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -212,10 +210,7 @@ fun ShinjikaiApp(
                 if (viewModel.settingsUiState.showIntroduction) {
                     IntroductionScreen(
                         onFinish = viewModel::dismissIntroduction,
-                        onOpenOfflineSetup = {
-                            viewModel.dismissIntroduction()
-                            viewModel.navigateTo(Screen.Settings)
-                        }
+                        onOpenOfflineSetup = viewModel::dismissIntroductionAndOpenSettings
                     )
                 } else {
                     when (currentScreen) {
@@ -270,21 +265,21 @@ private fun IntroductionScreen(
         listOf(
             OnboardingPage(
                 icon = Icons.Default.Search,
-                accent = listOf(Color(0xFF2A5EA8), Color(0xFF4EA1D3)),
+                accent = Color(0xFF3E7BC1),
                 eyebrowRes = R.string.intro_page_1_eyebrow,
                 titleRes = R.string.intro_page_1_title,
                 bodyRes = R.string.intro_page_1_body
             ),
             OnboardingPage(
                 icon = Icons.AutoMirrored.Filled.MenuBook,
-                accent = listOf(Color(0xFF00796B), Color(0xFF49B6A5)),
+                accent = Color(0xFF1D8A7A),
                 eyebrowRes = R.string.intro_page_2_eyebrow,
                 titleRes = R.string.intro_page_2_title,
                 bodyRes = R.string.intro_page_2_body
             ),
             OnboardingPage(
                 icon = Icons.Default.DownloadForOffline,
-                accent = listOf(Color(0xFF7B4DCC), Color(0xFFB786F8)),
+                accent = Color(0xFF8A63D2),
                 eyebrowRes = R.string.intro_page_3_eyebrow,
                 titleRes = R.string.intro_page_3_title,
                 bodyRes = R.string.intro_page_3_body
@@ -393,52 +388,40 @@ private fun IntroPageCard(
                 .fillMaxSize()
                 .padding(22.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(156.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Brush.linearGradient(page.accent))
-                    .border(
-                        width = 1.dp,
-                        color = Color.White.copy(alpha = 0.18f),
-                        shape = RoundedCornerShape(24.dp)
-                    ),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(page.accent),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.16f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = page.icon,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
+                    Icon(
+                        imageVector = page.icon,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = stringResource(page.eyebrowRes),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = stringResource(page.titleRes),
+                        style = MaterialTheme.typography.headlineSmall
+                    )
                 }
             }
-
-            Text(
-                text = stringResource(page.eyebrowRes),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = stringResource(page.titleRes),
-                style = MaterialTheme.typography.headlineSmall
-            )
             Text(
                 text = stringResource(page.bodyRes),
                 style = MaterialTheme.typography.bodyLarge,
@@ -450,7 +433,7 @@ private fun IntroPageCard(
 
 private data class OnboardingPage(
     val icon: ImageVector,
-    val accent: List<Color>,
+    val accent: Color,
     val eyebrowRes: Int,
     val titleRes: Int,
     val bodyRes: Int

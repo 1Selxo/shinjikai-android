@@ -2,13 +2,15 @@
 
 [English](./README.md) | [العربية](./README.ar.md)
 
+<div dir="rtl" align="right">
+
 تطبيق أندرويد مبني باستخدام Kotlin وJetpack Compose للبحث في قاموس ياباني إلى عربي عبر واجهة Shinjikai البرمجية:  
 `https://shinjikai.app`
 
 ## إخلاء مسؤولية
 
-ℹ️ هذا التطبيق مشروع مستقل من صنع المعجبين، وليس تابعًا رسميًا لـ **Shinjikai**.  
-وهو مبني باستخدام واجهة API الخاصة بموقع [shinjikai.app](https://shinjikai.app)، وجميع حقوق بيانات القاموس والجهد المبذول فيها تعود إلى القائم على موقع **Shinjikai**.
+ℹ️ هذا التطبيق مشروع مستقل ولا يرتبط رسميًا بـشنجكاي.  
+يعتمد على واجهة برمجة التطبيقات (API) المقدّمة من [shinjikai.app](https://shinjikai.app)، وتعود كامل حقوق بيانات القاموس وتطويرها إلى القائمين على موقع شنجكاي.
 
 ## ✨ المميزات
 
@@ -28,8 +30,8 @@
 ## 📱 لقطات الشاشة
 
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/Screenshot_1.png" alt="واجهة البحث في شينجيكاي" width="260" />
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/Screenshot_2.png" alt="واجهة تفاصيل الكلمة في شينجيكاي" width="260" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot-1.png" alt="واجهة البحث في شينجيكاي" width="260" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot-2.png" alt="واجهة تفاصيل الكلمة في شينجيكاي" width="260" />
 </p>
 
 ## 🧠 واجهات API المستخدمة
@@ -70,3 +72,5 @@
 
 - بيانات القاموس وواجهة API: **Shinjikai** (`https://shinjikai.app`)
 - رابط الأرشيف الافتراضي لمصدر البيانات دون اتصال يشير إلى مجموعة بيانات `a-hamdi/japanesearabic` التي يستخدمها مستورد التطبيق.
+
+</div>

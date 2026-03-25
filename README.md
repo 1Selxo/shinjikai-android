@@ -7,8 +7,8 @@ Android app (Kotlin + Jetpack Compose) for Japanese to Arabic dictionary lookup 
 
 ## Disclaimer
 
-ℹ️ This app is an independent fan-made project and is not officially affiliated with **Shinjikai**.  
-It is built using the API of [shinjikai.app](https://shinjikai.app), and full credit for the dictionary data and the work behind it goes to the **Shinjikai** website maintainer.
+ℹ️ This app is an independent project and is not officially affiliated with Shinjikai.  
+It uses the API provided by [shinjikai.app](https://shinjikai.app), and full credit for the dictionary data and its development goes to the Shinjikai website maintainers.
 
 ## ✨ Features
 

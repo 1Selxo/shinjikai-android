@@ -117,6 +117,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
 
     var currentScreen by mutableStateOf(Screen.Search)
     val screenStack = mutableStateListOf(Screen.Search)
+    private var introDismissedThisSession by mutableStateOf(false)
 
     var activeCategoryId by mutableStateOf<Int?>(null)
     var activeCategoryName by mutableStateOf<String?>(null)
@@ -173,7 +174,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     val settingsUiState: SettingsUiState
         get() = SettingsUiState(
             settings = settings.value,
-            showIntroduction = !settings.value.hasSeenIntroduction,
+            showIntroduction = !settings.value.hasSeenIntroduction && !introDismissedThisSession,
             isImportingOfflineData = isImportingOfflineData,
             offlineImportProgress = offlineImportProgress,
             offlineImportPhase = offlineImportPhase,
@@ -474,11 +475,23 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun dismissIntroduction() {
-        if (settings.value.hasSeenIntroduction) return
-        viewModelScope.launch { settingsStore.setHasSeenIntroduction(true) }
+        if (settings.value.hasSeenIntroduction || introDismissedThisSession) return
+        introDismissedThisSession = true
+        viewModelScope.launch {
+            runCatching { settingsStore.setHasSeenIntroduction(true) }
+                .onFailure { introDismissedThisSession = false }
+        }
+    }
+
+    fun dismissIntroductionAndOpenSettings() {
+        dismissIntroduction()
+        screenStack.clear()
+        screenStack.add(Screen.Search)
+        navigateTo(Screen.Settings)
     }
 
     fun showIntroductionAgain() {
+        introDismissedThisSession = false
         viewModelScope.launch { settingsStore.setHasSeenIntroduction(false) }
     }
 
