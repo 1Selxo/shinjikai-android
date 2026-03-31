@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     YomitanMetaEntity::class
     ],
     // Keep this >= the highest version that has ever shipped, otherwise existing installs may crash on downgrade.
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,7 +33,8 @@ abstract class AppDatabase : RoomDatabase() {
                         reading TEXT NOT NULL,
                         glossary TEXT NOT NULL,
                         note TEXT NOT NULL,
-                        source TEXT NOT NULL
+                        source TEXT NOT NULL,
+                        detailsJson TEXT
                     )
                     """.trimIndent()
                 )
@@ -123,7 +124,8 @@ abstract class AppDatabase : RoomDatabase() {
                         reading TEXT NOT NULL,
                         glossary TEXT NOT NULL,
                         note TEXT NOT NULL,
-                        source TEXT NOT NULL
+                        source TEXT NOT NULL,
+                        detailsJson TEXT
                     )
                     """.trimIndent()
                 )
@@ -180,6 +182,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                if (!tableExists(db, "yomitan_terms")) return
+                val cols = getTableColumns(db, "yomitan_terms")
+                if ("detailsJson" !in cols) {
+                    db.execSQL("ALTER TABLE yomitan_terms ADD COLUMN detailsJson TEXT")
+                }
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -190,7 +202,14 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "shinjikai.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(
+                        MIGRATION_1_2,
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5,
+                        MIGRATION_5_6,
+                        MIGRATION_6_7
+                    )
                     .build()
                     .also { INSTANCE = it }
             }

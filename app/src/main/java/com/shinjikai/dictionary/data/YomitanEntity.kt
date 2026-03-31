@@ -19,7 +19,8 @@ data class YomitanTermEntity(
     val reading: String,
     val glossary: String,
     val note: String = "",
-    val source: String = "yomitan"
+    val source: String = "yomitan",
+    val detailsJson: String? = null
 )
 
 @Fts4

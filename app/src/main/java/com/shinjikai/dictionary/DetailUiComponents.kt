@@ -350,6 +350,8 @@ private fun normalizeApiImageUrl(raw: String): String? {
     if (trimmed.isBlank()) return null
     val normalized = trimmed.replace('\\', '/')
     return when {
+        normalized.matches(Regex("""^[A-Za-z]:/.*""")) -> normalized
+        normalized.startsWith("file:/", true) -> normalized
         normalized.startsWith("https://", true) -> normalized
         normalized.startsWith("http://", true) -> "https://${normalized.removePrefix("http://")}"
         normalized.startsWith("//") -> "https:$normalized"

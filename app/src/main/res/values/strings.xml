@@ -70,6 +70,17 @@
     <string name="settings_last_local_update">آخر تحديث محلي: %1$s</string>
     <string name="settings_loading_inline">جاري التحميل...</string>
     <string name="settings_download_local_dictionary">تحميل القاموس المحلي</string>
+    <string name="settings_offline_archives_title">تنزيل ملفات القاموس</string>
+    <string name="settings_offline_archives_description">افتح صفحة الإصدار لتحميل أرشيف النص أو أرشيف الصور ثم استوردهما داخل التطبيق.</string>
+    <string name="settings_offline_archives_open">فتح صفحة تنزيل القاموس</string>
+    <string name="settings_updates_title">تحديثات التطبيق</string>
+    <string name="settings_updates_idle">يمكنك التحقق من توفر إصدار جديد من هنا.</string>
+    <string name="settings_updates_check_now">التحقق من التحديثات</string>
+    <string name="settings_updates_checking">جاري التحقق...</string>
+    <string name="settings_updates_up_to_date">أنت تستخدم أحدث إصدار متاح.</string>
+    <string name="settings_updates_available_version">توفر الإصدار %1$s.</string>
+    <string name="settings_updates_open">فتح صفحة التحديث</string>
+    <string name="settings_updates_check_failed">تعذّر التحقق من التحديثات.</string>
     <string name="settings_onboarding_title">المقدمة</string>
     <string name="settings_onboarding_description">إذا أردت مشاهدة الشرح التعريفي مرة أخرى، يمكنك فتحه من هنا في أي وقت.</string>
     <string name="settings_onboarding_show_again">عرض المقدمة مرة أخرى</string>
@@ -88,7 +99,10 @@
 
     <string name="offline_import_phase_download">جاري تنزيل ملفات القاموس...</string>
     <string name="offline_import_phase_index">جاري فهرسة القاموس المحلي...</string>
+    <string name="offline_import_phase_images">جاري تثبيت الصور المحلية...</string>
     <string name="offline_import_success">تم تحميل %1$d كلمة للاستخدام بدون إنترنت.</string>
+    <string name="offline_import_success_with_images">تم تحميل %1$d كلمة وتثبيت الصور للاستخدام بدون إنترنت.</string>
+    <string name="offline_images_install_success">تم تثبيت الصور المحلية. ستظهر الصور مع القاموس الحالي.</string>
     <string name="offline_import_failure">فشل تحميل القاموس المحلي.</string>
     <string name="offline_import_invalid_zip">ملف القاموس الذي تم تنزيله غير صالح.</string>
     <string name="offline_download_prompt_title">&#x064A;&#x0644;&#x0632;&#x0645; &#x062A;&#x062D;&#x0645;&#x064A;&#x0644; &#x0627;&#x0644;&#x0642;&#x0627;&#x0645;&#x0648;&#x0633; &#x0627;&#x0644;&#x0645;&#x062D;&#x0644;&#x064A;</string>

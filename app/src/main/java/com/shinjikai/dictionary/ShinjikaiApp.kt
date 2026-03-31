@@ -1,6 +1,10 @@
 package com.shinjikai.dictionary
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.speech.tts.TextToSpeech
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -100,6 +104,19 @@ fun ShinjikaiApp(
             }
             "v${info.versionName ?: "?"} ($code)"
         }.getOrDefault("v1.0")
+    }
+    val pickOfflineZipLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            viewModel.importOfflineDictionaryFromUri(uri)
+        }
     }
 
     var textToSpeech by remember(context) { mutableStateOf<TextToSpeech?>(null) }
@@ -238,6 +255,15 @@ fun ShinjikaiApp(
                             supportsDynamicColor = supportsDynamicColor,
                             uiState = viewModel.settingsUiState,
                             viewModel = viewModel,
+                            onPickOfflineZip = {
+                                pickOfflineZipLauncher.launch(
+                                    arrayOf(
+                                        "application/zip",
+                                        "application/x-xz",
+                                        "application/octet-stream"
+                                    )
+                                )
+                            },
                             onGoBack = viewModel::goBack
                         )
                         Screen.Detail -> DetailScreenContent(
@@ -250,6 +276,7 @@ fun ShinjikaiApp(
                         )
                     }
                 }
+
             }
         }
     }

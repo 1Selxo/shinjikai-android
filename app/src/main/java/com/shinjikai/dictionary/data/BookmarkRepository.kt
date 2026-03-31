@@ -5,11 +5,13 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
 import com.google.gson.Gson
+import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class BookmarkRepository(
     private val bookmarkDao: BookmarkDao,
+    private val yomitanDao: YomitanDao,
     private val gson: Gson = Gson()
 ) {
     fun pagedFlow(pageSize: Int = 30): Flow<PagingData<BookmarkItem>> {
@@ -64,7 +66,13 @@ class BookmarkRepository(
     suspend fun getSavedDetails(id: Int): WordDetailsResponse? {
         val json = bookmarkDao.getDetailsJsonById(id)?.trim().orEmpty()
         if (json.isBlank()) return null
-        return runCatching { gson.fromJson(json, WordDetailsResponse::class.java) }.getOrNull()
+        val imageDirectory = yomitanDao.getMetaValue(OFFLINE_IMAGE_DIR_META_KEY)
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::File)
+        return runCatching {
+            gson.fromJson(json, WordDetailsResponse::class.java)
+                .withResolvedOfflineImages(imageDirectory)
+        }.getOrNull()
     }
 
     suspend fun deleteById(id: Int) {

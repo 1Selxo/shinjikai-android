@@ -56,7 +56,8 @@ class YomitanImporter(
                                         reading = reading.ifBlank { expression },
                                         glossary = glossary.ifBlank { "-" },
                                         note = "",
-                                        source = sourceLabel
+                                        source = sourceLabel,
+                                        detailsJson = null
                                     )
                                 )
                                 idSeed += 1

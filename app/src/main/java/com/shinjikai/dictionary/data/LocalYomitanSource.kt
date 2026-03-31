@@ -1,5 +1,9 @@
 package com.shinjikai.dictionary.data
 
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import java.io.File
+
 private val BULLET_PREFIX_REGEX = Regex("""(?m)^\s*[🔹▪•●◦]\s*""")
 private val MULTISPACE_REGEX = Regex("""\s{2,}""")
 private val ARABIC_DIACRITICS_REGEX = Regex("""[\u064B-\u065F\u0670\u06D6-\u06ED]""")
@@ -7,7 +11,8 @@ private val ARABIC_ALEF_VARIANTS_REGEX = Regex("""[أإآٱ]""")
 private val NON_LETTER_NUMBER_SPACE_REGEX = Regex("""[^\p{L}\p{N}\s]""")
 
 class LocalYomitanSource(
-    private val yomitanDao: YomitanDao
+    private val yomitanDao: YomitanDao,
+    private val gson: Gson = Gson()
 ) : DictionarySource {
     override suspend fun searchWords(term: String, page: Int): Result<SearchWordsResponse> {
         val query = term.trim()
@@ -125,6 +130,15 @@ class LocalYomitanSource(
         return runCatching {
             val row = yomitanDao.getById(id)
                 ?: error("No local entry found for id=$id")
+            val imageDirectory = yomitanDao.getMetaValue(OFFLINE_IMAGE_DIR_META_KEY)
+                ?.takeIf { it.isNotBlank() }
+                ?.let(::File)
+            row.detailsJson
+                ?.takeIf { it.isNotBlank() }
+                ?.let { serialized ->
+                    return@runCatching gson.fromJson(serialized, WordDetailsResponse::class.java)
+                        .withResolvedOfflineImages(imageDirectory)
+                }
             WordDetailsResponse(
                 word = WordDetailsWord(
                     id = row.id,
@@ -143,7 +157,15 @@ class LocalYomitanSource(
     }
 
     override suspend fun loadCategories(): Result<LoadCategoriesResponse> {
-        return Result.success(LoadCategoriesResponse())
+        return runCatching {
+            val categoriesJson = yomitanDao.getMetaValue("categories_json").orEmpty()
+            if (categoriesJson.isBlank()) {
+                LoadCategoriesResponse()
+            } else {
+                val type = object : TypeToken<List<CategoryRef>>() {}.type
+                LoadCategoriesResponse(categories = gson.fromJson(categoriesJson, type) ?: emptyList())
+            }
+        }
     }
 
     override suspend fun loadCategory(id: Int, page: Int): Result<LoadCategoryResponse> {

@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import java.io.File
 import kotlinx.coroutines.flow.Flow
@@ -27,6 +28,7 @@ class SettingsStore(
         val USE_DYNAMIC_COLOR = booleanPreferencesKey("use_dynamic_color")
         val USE_OFFLINE_MODE = booleanPreferencesKey("use_offline_mode")
         val HAS_SEEN_INTRODUCTION = booleanPreferencesKey("has_seen_introduction")
+        val LAST_UPDATE_CHECK_EPOCH_MS = longPreferencesKey("last_update_check_epoch_ms")
     }
 
     /**
@@ -40,7 +42,8 @@ class SettingsStore(
             useOfflineMode = cachePrefs.getBoolean("use_offline_mode", false),
             hasSeenIntroduction = resolveHasSeenIntroduction(
                 legacySeen = cachePrefs.getBoolean("has_seen_introduction", false)
-            )
+            ),
+            lastUpdateCheckEpochMs = cachePrefs.getLong("last_update_check_epoch_ms", 0L)
         )
     }
 
@@ -57,7 +60,8 @@ class SettingsStore(
                 useOfflineMode = prefs[Keys.USE_OFFLINE_MODE] ?: false,
                 hasSeenIntroduction = resolveHasSeenIntroduction(
                     legacySeen = prefs[Keys.HAS_SEEN_INTRODUCTION] ?: false
-                )
+                ),
+                lastUpdateCheckEpochMs = prefs[Keys.LAST_UPDATE_CHECK_EPOCH_MS] ?: 0L
             )
         }
         .onEach { settings ->
@@ -67,6 +71,7 @@ class SettingsStore(
                 .putBoolean("use_dynamic_color", settings.useDynamicColor)
                 .putBoolean("use_offline_mode", settings.useOfflineMode)
                 .putBoolean("has_seen_introduction", settings.hasSeenIntroduction)
+                .putLong("last_update_check_epoch_ms", settings.lastUpdateCheckEpochMs)
                 .apply()
             syncIntroductionMarker(settings.hasSeenIntroduction)
         }
@@ -90,6 +95,11 @@ class SettingsStore(
         context.settingsDataStore.edit { prefs -> prefs[Keys.HAS_SEEN_INTRODUCTION] = seen }
         cachePrefs.edit().putBoolean("has_seen_introduction", seen).apply()
         syncIntroductionMarker(seen)
+    }
+
+    suspend fun setLastUpdateCheckEpochMs(epochMs: Long) {
+        context.settingsDataStore.edit { prefs -> prefs[Keys.LAST_UPDATE_CHECK_EPOCH_MS] = epochMs }
+        cachePrefs.edit().putLong("last_update_check_epoch_ms", epochMs).apply()
     }
 
     private fun resolveHasSeenIntroduction(legacySeen: Boolean): Boolean {

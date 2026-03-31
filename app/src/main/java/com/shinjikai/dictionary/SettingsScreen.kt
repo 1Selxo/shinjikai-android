@@ -56,6 +56,7 @@ fun SettingsScreenContent(
     supportsDynamicColor: Boolean,
     uiState: SettingsUiState,
     viewModel: ShinjikaiViewModel,
+    onPickOfflineZip: () -> Unit,
     onGoBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -147,8 +148,29 @@ fun SettingsScreenContent(
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
                         )
                     }
+                    uiState.offlineLastImportSource?.let { source ->
+                        Text(
+                            text = "Source: $source",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                        )
+                    }
+                    SettingsLinkRow(
+                        icon = Icons.AutoMirrored.Filled.OpenInNew,
+                        title = stringResource(R.string.settings_offline_archives_title),
+                        description = stringResource(R.string.settings_offline_archives_description),
+                        contentDescription = stringResource(R.string.settings_offline_archives_open),
+                        onClick = {
+                            context.startActivity(
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("https://github.com/obj44/shinjikai/releases/tag/dict-v1")
+                                )
+                            )
+                        }
+                    )
                     TextButton(
-                        onClick = viewModel::importOfflineDictionary,
+                        onClick = onPickOfflineZip,
                         enabled = !uiState.isImportingOfflineData
                     ) {
                         if (uiState.isImportingOfflineData) {
@@ -226,6 +248,7 @@ fun SettingsScreenContent(
                     )
                 }
             }
+
         }
     }
 }
