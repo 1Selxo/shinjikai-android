@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import com.google.gson.stream.JsonReader
 import com.google.gson.stream.JsonToken
 import java.io.BufferedInputStream
+import java.io.File
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.util.Locale
@@ -21,15 +22,17 @@ class YomitanImporter(
     suspend fun importFromZip(zipStream: InputStream, sourceLabel: String = "yomitan-v2"): Result<Int> {
         return runCatching {
             withContext(Dispatchers.IO) {
+                AppDatabase.repairOfflineDictionarySchema(database.openHelper.writableDatabase)
+
                 var importedCount = 0
                 var idSeed = 1
-                val buffer = ArrayList<YomitanTermEntity>(800)
+                val buffer = ArrayList<YomitanTermEntity>(1200)
 
                 coroutineContext.ensureActive()
                 database.withTransaction {
-                    // Keep the FTS table in sync with the base table.
                     yomitanDao.clearTermsFts()
                     yomitanDao.clearTerms()
+                    yomitanDao.clearCategoryRefs()
 
                     ZipInputStream(BufferedInputStream(zipStream)).use { zis ->
                         while (true) {
@@ -55,6 +58,7 @@ class YomitanImporter(
                                         expression = expression.ifBlank { reading },
                                         reading = reading.ifBlank { expression },
                                         glossary = glossary.ifBlank { "-" },
+                                        difficulty = 0,
                                         note = "",
                                         source = sourceLabel,
                                         detailsJson = null
@@ -63,7 +67,7 @@ class YomitanImporter(
                                 idSeed += 1
                                 importedCount += 1
 
-                                if (buffer.size >= 800) {
+                                if (buffer.size >= 1200) {
                                     yomitanDao.upsertAll(buffer)
                                     yomitanDao.upsertAllFts(buffer.map { it.toFts() })
                                     buffer.clear()
@@ -71,6 +75,91 @@ class YomitanImporter(
                             }
 
                             zis.closeEntry()
+                        }
+                    }
+
+                    if (buffer.isNotEmpty()) {
+                        yomitanDao.upsertAll(buffer)
+                        yomitanDao.upsertAllFts(buffer.map { it.toFts() })
+                        buffer.clear()
+                    }
+
+                    yomitanDao.upsertMeta(YomitanMetaEntity(key = "last_import_source", value = sourceLabel))
+                    yomitanDao.upsertMeta(YomitanMetaEntity(key = "last_import_count", value = importedCount.toString()))
+                    yomitanDao.upsertMeta(
+                        YomitanMetaEntity(
+                            key = "last_import_epoch_ms",
+                            value = System.currentTimeMillis().toString()
+                        )
+                    )
+                }
+
+                importedCount
+            }
+        }
+    }
+
+    suspend fun importFromDirectory(directory: File, sourceLabel: String = "yomitan-v2"): Result<Int> {
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                require(directory.exists()) { "Offline source directory was not found." }
+                require(directory.isDirectory) { "Offline source path is not a directory." }
+
+                AppDatabase.repairOfflineDictionarySchema(database.openHelper.writableDatabase)
+
+                val termBankFiles = directory.walkTopDown()
+                    .filter { file ->
+                        file.isFile &&
+                            file.name.lowercase(Locale.ROOT).startsWith("term_bank_") &&
+                            file.extension.equals("json", ignoreCase = true)
+                    }
+                    .sortedBy { it.absolutePath }
+                    .toList()
+
+                require(termBankFiles.isNotEmpty()) { "Selected archive does not contain Yomitan term banks." }
+
+                var importedCount = 0
+                var idSeed = 1
+                val buffer = ArrayList<YomitanTermEntity>(1200)
+
+                coroutineContext.ensureActive()
+                database.withTransaction {
+                    yomitanDao.clearTermsFts()
+                    yomitanDao.clearTerms()
+                    yomitanDao.clearCategoryRefs()
+
+                    termBankFiles.forEach { file ->
+                        coroutineContext.ensureActive()
+                        val reader = JsonReader(file.reader(Charsets.UTF_8)).apply {
+                            isLenient = true
+                        }
+
+                        reader.use {
+                            parseTermBank(it) { expression, reading, glossary ->
+                                coroutineContext.ensureActive()
+                                if (expression.isBlank() && reading.isBlank()) return@parseTermBank
+
+                                buffer.add(
+                                    YomitanTermEntity(
+                                        id = idSeed,
+                                        expression = expression.ifBlank { reading },
+                                        reading = reading.ifBlank { expression },
+                                        glossary = glossary.ifBlank { "-" },
+                                        difficulty = 0,
+                                        note = "",
+                                        source = sourceLabel,
+                                        detailsJson = null
+                                    )
+                                )
+                                idSeed += 1
+                                importedCount += 1
+
+                                if (buffer.size >= 1200) {
+                                    yomitanDao.upsertAll(buffer)
+                                    yomitanDao.upsertAllFts(buffer.map { it.toFts() })
+                                    buffer.clear()
+                                }
+                            }
                         }
                     }
 

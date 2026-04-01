@@ -194,7 +194,6 @@ fun DetailScreenBody(
                 }
             },
             onCategoryClick = { chip ->
-                if (useOfflineMode) return@DetailWordHeaderCard
                 viewModel.navigateTo(Screen.Search)
                 focusManager.clearFocus()
                 viewModel.runCategorySearch(chip.id, chip.label)
@@ -236,17 +235,27 @@ fun DetailScreenBody(
             .filter { it.text.isNotBlank() || it.kana.isNotBlank() }
             .distinctBy { "${it.wordId}|${it.meaningNo}|${it.text.trim()}|${it.kana.trim()}" }
         if (relatedItems.isNotEmpty()) {
-            RelatedWordsCard(title = stringResource(R.string.detail_related_words_title), items = relatedItems, onWordClick = {
-                focusManager.clearFocus()
-                viewModel.openDetailsByRelatedItem(it)
-            })
+            RelatedWordsCard(
+                title = stringResource(R.string.detail_related_words_title),
+                items = relatedItems,
+                expandAllByDefault = useOfflineMode,
+                onWordClick = {
+                    focusManager.clearFocus()
+                    viewModel.openDetailsByRelatedItem(it)
+                }
+            )
         }
 
         val examples = detailState.details?.sentenceSearch.orEmpty()
             .filter { it.text.isNotBlank() || it.kana.isNotBlank() || it.arabic.isNotBlank() }
             .distinctBy { "${it.id}|${it.text.trim()}|${it.kana.trim()}|${it.arabic.trim()}" }
         if (examples.isNotEmpty()) {
-            ExamplesCard(title = stringResource(R.string.detail_examples_title), items = examples)
+            ExamplesCard(
+                title = stringResource(R.string.detail_examples_title),
+                items = examples,
+                expandAllByDefault = useOfflineMode,
+                showAllByDefault = useOfflineMode
+            )
         }
     }
 }
@@ -687,8 +696,16 @@ private fun PictureCard(url: String) {
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-private fun RelatedWordsCard(title: String, items: List<RelatedWordItem>, onWordClick: (RelatedWordItem) -> Unit) {
-    var visibleCount by remember(items) { mutableStateOf(RELATED_WORDS_PAGE_SIZE.coerceAtMost(items.size)) }
+private fun RelatedWordsCard(
+    title: String,
+    items: List<RelatedWordItem>,
+    expandAllByDefault: Boolean = false,
+    onWordClick: (RelatedWordItem) -> Unit
+) {
+    var expanded by remember(items, expandAllByDefault) { mutableStateOf(expandAllByDefault) }
+    var visibleCount by remember(items, expandAllByDefault) {
+        mutableStateOf(if (expandAllByDefault) items.size else RELATED_WORDS_PAGE_SIZE.coerceAtMost(items.size))
+    }
     val wordFallback = stringResource(R.string.detail_word_fallback)
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -697,28 +714,50 @@ private fun RelatedWordsCard(title: String, items: List<RelatedWordItem>, onWord
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(text = title, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items.take(visibleCount).forEach { item ->
-                    Surface(
-                        shape = RoundedCornerShape(999.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.clickable { onWordClick(item) }
-                    ) {
-                        Text(
-                            text = item.text.ifBlank { item.kana.ifBlank { wordFallback.format(item.wordId) } },
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                        )
+            if (expanded) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items.take(visibleCount).forEach { item ->
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.clickable { onWordClick(item) }
+                        ) {
+                            Text(
+                                text = item.text.ifBlank { item.kana.ifBlank { wordFallback.format(item.wordId) } },
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            )
+                        }
                     }
                 }
-            }
-            if (visibleCount < items.size) {
-                TextButton(onClick = { visibleCount = (visibleCount + RELATED_WORDS_PAGE_SIZE).coerceAtMost(items.size) }) {
-                    Text(stringResource(R.string.detail_show_more))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (visibleCount < items.size) {
+                        TextButton(onClick = { visibleCount = (visibleCount + RELATED_WORDS_PAGE_SIZE).coerceAtMost(items.size) }) {
+                            Text(stringResource(R.string.detail_show_more))
+                        }
+                    } else {
+                        Spacer(modifier = Modifier)
+                    }
+                    TextButton(onClick = { expanded = false }) {
+                        Text(stringResource(R.string.detail_card_collapse))
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = { expanded = true }) {
+                        Text(stringResource(R.string.detail_show_more))
+                    }
                 }
             }
         }
@@ -727,9 +766,18 @@ private fun RelatedWordsCard(title: String, items: List<RelatedWordItem>, onWord
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-private fun ExamplesCard(title: String, items: List<SentenceExample>) {
-    var expanded by remember(items) { mutableStateOf(true) }
-    var visibleCount by remember(items) { mutableStateOf(EXAMPLES_PAGE_SIZE.coerceAtMost(items.size)) }
+private fun ExamplesCard(
+    title: String,
+    items: List<SentenceExample>,
+    expandAllByDefault: Boolean = false,
+    showAllByDefault: Boolean = false
+) {
+    var expanded by remember(items, expandAllByDefault) { mutableStateOf(expandAllByDefault) }
+    var visibleCount by remember(items, showAllByDefault) {
+        mutableStateOf(
+            if (showAllByDefault) items.size else EXAMPLES_PAGE_SIZE.coerceAtMost(items.size)
+        )
+    }
     val context = androidx.compose.ui.platform.LocalContext.current
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
     val exampleFallback = stringResource(R.string.detail_example_fallback)

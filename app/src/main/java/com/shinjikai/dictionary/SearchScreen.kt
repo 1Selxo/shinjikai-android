@@ -185,7 +185,6 @@ fun SearchScreenContent(
 
                 SearchModeTabs(
                     useOfflineMode = useOfflineMode,
-                    hasOfflineDictionary = hasOfflineDictionary,
                     onModeSelected = { selectedOffline ->
                         if (selectedOffline && !hasOfflineDictionary) {
                             showOfflineDownloadPrompt = true
@@ -260,18 +259,36 @@ fun SearchScreenContent(
 
             when {
                 showLanding -> {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = appName,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
+                    if (useOfflineMode && uiState.offlinePreviewItems.isNotEmpty()) {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(
+                                items = uiState.offlinePreviewItems,
+                                key = { it.id }
+                            ) { item ->
+                                OfflinePreviewCard(
+                                    item = item,
+                                    onClick = { onOpenDetails(item) }
+                                )
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = appName,
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
 
@@ -405,9 +422,55 @@ fun SearchScreenContent(
 }
 
 @Composable
+private fun OfflinePreviewCard(
+    item: SearchItem,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = item.kana,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.primaryWriting.ifBlank { item.kana },
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                CommonnessBadge(difficulty = item.difficulty)
+            }
+            Text(
+                text = forceRtlText(formatOfflineSearchPreview(item.meaningSummary)),
+                style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Rtl),
+                textAlign = TextAlign.Right,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun SearchModeTabs(
     useOfflineMode: Boolean,
-    hasOfflineDictionary: Boolean,
     onModeSelected: (Boolean) -> Unit
 ) {
     val selectedIndex = if (useOfflineMode) 0 else 1

@@ -18,6 +18,7 @@ data class YomitanTermEntity(
     val expression: String,
     val reading: String,
     val glossary: String,
+    val difficulty: Int = 0,
     val note: String = "",
     val source: String = "yomitan",
     val detailsJson: String? = null
@@ -38,4 +39,17 @@ data class YomitanTermFtsEntity(
 data class YomitanMetaEntity(
     @PrimaryKey val key: String,
     val value: String
+)
+
+@Entity(
+    tableName = "yomitan_term_categories",
+    primaryKeys = ["termId", "categoryId"],
+    indices = [
+        Index(value = ["categoryId"]),
+        Index(value = ["termId"])
+    ]
+)
+data class YomitanTermCategoryEntity(
+    val termId: Int,
+    val categoryId: Int
 )

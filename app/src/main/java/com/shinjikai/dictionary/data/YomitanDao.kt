@@ -98,6 +98,37 @@ interface YomitanDao {
     @Query("SELECT * FROM yomitan_terms WHERE id = :id LIMIT 1")
     suspend fun getById(id: Int): YomitanTermEntity?
 
+    @Query("SELECT * FROM yomitan_terms")
+    suspend fun loadAllTerms(): List<YomitanTermEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertCategoryRefs(items: List<YomitanTermCategoryEntity>)
+
+    @Query("DELETE FROM yomitan_term_categories")
+    suspend fun clearCategoryRefs()
+
+    @Query("SELECT COUNT(*) FROM yomitan_term_categories")
+    suspend fun countCategoryRefs(): Int
+
+    @Query(
+        """
+        SELECT t.*
+        FROM yomitan_terms t
+        INNER JOIN yomitan_term_categories c ON c.termId = t.id
+        WHERE c.categoryId = :categoryId
+        ORDER BY t.id ASC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    suspend fun loadCategoryTermsPaged(
+        categoryId: Int,
+        limit: Int,
+        offset: Int
+    ): List<YomitanTermEntity>
+
+    @Query("SELECT COUNT(*) FROM yomitan_term_categories WHERE categoryId = :categoryId")
+    suspend fun countCategoryTerms(categoryId: Int): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(items: List<YomitanTermEntity>)
 
@@ -113,10 +144,16 @@ interface YomitanDao {
     @Query("SELECT COUNT(*) FROM yomitan_terms")
     suspend fun countTerms(): Int
 
+    @Query("SELECT * FROM yomitan_terms ORDER BY RANDOM() LIMIT :limit")
+    suspend fun loadPreviewTerms(limit: Int = 6): List<YomitanTermEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMeta(meta: YomitanMetaEntity)
 
     @Query("SELECT value FROM yomitan_meta WHERE key = :key LIMIT 1")
     suspend fun getMetaValue(key: String): String?
+
+    @Query("DELETE FROM yomitan_meta WHERE key = :key")
+    suspend fun deleteMeta(key: String)
 }
 

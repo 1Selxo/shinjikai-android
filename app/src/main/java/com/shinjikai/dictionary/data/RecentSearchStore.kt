@@ -8,7 +8,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.google.gson.JsonArray
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -67,8 +67,10 @@ class RecentSearchStore(
     private fun decode(raw: String?): List<String> {
         if (raw.isNullOrBlank()) return emptyList()
         return runCatching {
-            val type = object : TypeToken<List<String>>() {}.type
-            gson.fromJson<List<String>>(raw, type).orEmpty()
+            val array = gson.fromJson(raw, JsonArray::class.java) ?: return@runCatching emptyList()
+            array.mapNotNull { element ->
+                runCatching { element.asString }.getOrNull()
+            }
         }.getOrDefault(emptyList())
             .map(String::trim)
             .filter(String::isNotBlank)

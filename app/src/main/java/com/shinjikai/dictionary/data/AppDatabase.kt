@@ -12,10 +12,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BookmarkEntity::class,
         YomitanTermEntity::class,
         YomitanTermFtsEntity::class,
-    YomitanMetaEntity::class
+        YomitanMetaEntity::class,
+        YomitanTermCategoryEntity::class
     ],
     // Keep this >= the highest version that has ever shipped, otherwise existing installs may crash on downgrade.
-    version = 7,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -32,6 +33,7 @@ abstract class AppDatabase : RoomDatabase() {
                         expression TEXT NOT NULL,
                         reading TEXT NOT NULL,
                         glossary TEXT NOT NULL,
+                        difficulty INTEGER NOT NULL DEFAULT 0,
                         note TEXT NOT NULL,
                         source TEXT NOT NULL,
                         detailsJson TEXT
@@ -123,6 +125,7 @@ abstract class AppDatabase : RoomDatabase() {
                         expression TEXT NOT NULL,
                         reading TEXT NOT NULL,
                         glossary TEXT NOT NULL,
+                        difficulty INTEGER NOT NULL DEFAULT 0,
                         note TEXT NOT NULL,
                         source TEXT NOT NULL,
                         detailsJson TEXT
@@ -192,6 +195,36 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS yomitan_term_categories (
+                        termId INTEGER NOT NULL,
+                        categoryId INTEGER NOT NULL,
+                        PRIMARY KEY(termId, categoryId)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_yomitan_term_categories_categoryId ON yomitan_term_categories(categoryId)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_yomitan_term_categories_termId ON yomitan_term_categories(termId)"
+                )
+            }
+        }
+
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                if (!tableExists(db, "yomitan_terms")) return
+                val cols = getTableColumns(db, "yomitan_terms")
+                if ("difficulty" !in cols) {
+                    db.execSQL("ALTER TABLE yomitan_terms ADD COLUMN difficulty INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -208,11 +241,67 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_3_4,
                         MIGRATION_4_5,
                         MIGRATION_5_6,
-                        MIGRATION_6_7
+                        MIGRATION_6_7,
+                        MIGRATION_7_8,
+                        MIGRATION_8_9
                     )
                     .build()
                     .also { INSTANCE = it }
             }
+        }
+
+        fun repairOfflineDictionarySchema(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS yomitan_terms (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    expression TEXT NOT NULL,
+                    reading TEXT NOT NULL,
+                    glossary TEXT NOT NULL,
+                    difficulty INTEGER NOT NULL DEFAULT 0,
+                    note TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    detailsJson TEXT
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS yomitan_meta (
+                    key TEXT NOT NULL PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS yomitan_term_categories (
+                    termId INTEGER NOT NULL,
+                    categoryId INTEGER NOT NULL,
+                    PRIMARY KEY(termId, categoryId)
+                )
+                """.trimIndent()
+            )
+
+            val termColumns = getTableColumns(db, "yomitan_terms")
+            if ("difficulty" !in termColumns) {
+                db.execSQL("ALTER TABLE yomitan_terms ADD COLUMN difficulty INTEGER NOT NULL DEFAULT 0")
+            }
+            if ("detailsJson" !in termColumns) {
+                db.execSQL("ALTER TABLE yomitan_terms ADD COLUMN detailsJson TEXT")
+            }
+
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_yomitan_terms_expression ON yomitan_terms(expression)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_yomitan_terms_reading ON yomitan_terms(reading)")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_yomitan_term_categories_categoryId ON yomitan_term_categories(categoryId)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_yomitan_term_categories_termId ON yomitan_term_categories(termId)"
+            )
+
+            db.execSQL("DROP TABLE IF EXISTS yomitan_terms_fts")
+            db.execSQL("CREATE VIRTUAL TABLE yomitan_terms_fts USING fts4(expression, reading, glossary)")
         }
 
         private fun tableExists(db: SupportSQLiteDatabase, table: String): Boolean {

@@ -4,7 +4,8 @@ enum class Screen {
     Search,
     Detail,
     Bookmarks,
-    Settings
+    Settings,
+    LocalDictionary
 }
 
 enum class ResultMode {
@@ -12,4 +13,3 @@ enum class ResultMode {
     Search,
     Category
 }
-

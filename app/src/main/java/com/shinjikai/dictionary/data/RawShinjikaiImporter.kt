@@ -26,13 +26,17 @@ class RawShinjikaiImporter(
                 require(jsonlFile.exists()) { "Offline source file was not found." }
                 require(jsonlFile.isFile) { "Offline source path is not a file." }
 
+                AppDatabase.repairOfflineDictionarySchema(database.openHelper.writableDatabase)
+
                 var importedCount = 0
                 val categoriesById = linkedMapOf<Int, CategoryRef>()
-                val buffer = ArrayList<YomitanTermEntity>(250)
+                val buffer = ArrayList<YomitanTermEntity>(500)
+                val categoryBuffer = ArrayList<YomitanTermCategoryEntity>(1000)
 
                 database.withTransaction {
                     yomitanDao.clearTermsFts()
                     yomitanDao.clearTerms()
+                    yomitanDao.clearCategoryRefs()
 
                     jsonlFile.bufferedReader(Charsets.UTF_8).useLines { lines ->
                         lines.forEach { rawLine ->
@@ -48,6 +52,12 @@ class RawShinjikaiImporter(
                             record.categories.forEach { category ->
                                 if (category.id > 0 && category.name.isNotBlank()) {
                                     categoriesById.putIfAbsent(category.id, category)
+                                    categoryBuffer.add(
+                                        YomitanTermCategoryEntity(
+                                            termId = id,
+                                            categoryId = category.id
+                                        )
+                                    )
                                 }
                             }
 
@@ -78,6 +88,7 @@ class RawShinjikaiImporter(
                                     reading = normalizedWord.kana.trim()
                                         .ifBlank { normalizedWord.writings.firstOrNull()?.text?.trim().orEmpty() },
                                     glossary = buildMeaningSummary(normalizedWord.meanings).ifBlank { "-" },
+                                    difficulty = normalizedWord.difficulty,
                                     note = normalizedWord.meanings.firstOrNull()?.note.orEmpty().trim(),
                                     source = sourceLabel,
                                     detailsJson = gson.toJson(details)
@@ -85,14 +96,17 @@ class RawShinjikaiImporter(
                             )
                             importedCount += 1
 
-                            if (buffer.size >= 250) {
-                                flush(buffer)
+                            if (buffer.size >= 500) {
+                                flush(buffer, categoryBuffer)
                             }
                         }
                     }
 
                     if (buffer.isNotEmpty()) {
-                        flush(buffer)
+                        flush(buffer, categoryBuffer)
+                    } else if (categoryBuffer.isNotEmpty()) {
+                        yomitanDao.upsertCategoryRefs(categoryBuffer)
+                        categoryBuffer.clear()
                     }
 
                     yomitanDao.upsertMeta(
@@ -116,9 +130,16 @@ class RawShinjikaiImporter(
         }
     }
 
-    private suspend fun flush(buffer: MutableList<YomitanTermEntity>) {
+    private suspend fun flush(
+        buffer: MutableList<YomitanTermEntity>,
+        categoryBuffer: MutableList<YomitanTermCategoryEntity>
+    ) {
         yomitanDao.upsertAll(buffer)
         yomitanDao.upsertAllFts(buffer.map { it.toFts() })
+        if (categoryBuffer.isNotEmpty()) {
+            yomitanDao.upsertCategoryRefs(categoryBuffer)
+            categoryBuffer.clear()
+        }
         buffer.clear()
     }
 

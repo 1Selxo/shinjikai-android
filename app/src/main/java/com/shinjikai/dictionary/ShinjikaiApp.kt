@@ -255,12 +255,18 @@ fun ShinjikaiApp(
                             supportsDynamicColor = supportsDynamicColor,
                             uiState = viewModel.settingsUiState,
                             viewModel = viewModel,
+                            onGoBack = viewModel::goBack
+                        )
+                        Screen.LocalDictionary -> LocalDictionaryScreenContent(
+                            uiState = viewModel.settingsUiState,
                             onPickOfflineZip = {
                                 pickOfflineZipLauncher.launch(
                                     arrayOf(
                                         "application/zip",
                                         "application/x-xz",
-                                        "application/octet-stream"
+                                        "application/x-gtar",
+                                        "application/octet-stream",
+                                        "*/*"
                                     )
                                 )
                             },

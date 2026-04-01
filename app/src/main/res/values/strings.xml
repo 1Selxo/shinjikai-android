@@ -98,6 +98,7 @@
     <string name="error_bookmark_save">تعذّر حفظ الكلمة في المحفوظات.</string>
 
     <string name="offline_import_phase_download">جاري تنزيل ملفات القاموس...</string>
+    <string name="offline_import_phase_prepare">جاري تجهيز الاستيراد...</string>
     <string name="offline_import_phase_index">جاري فهرسة القاموس المحلي...</string>
     <string name="offline_import_phase_images">جاري تثبيت الصور المحلية...</string>
     <string name="offline_import_success">تم تحميل %1$d كلمة للاستخدام بدون إنترنت.</string>

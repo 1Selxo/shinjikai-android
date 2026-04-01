@@ -1,10 +1,10 @@
 package com.shinjikai.dictionary.data
 
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.google.gson.JsonArray
 import java.io.File
 
-private val BULLET_PREFIX_REGEX = Regex("""(?m)^\s*[🔹▪•●◦]\s*""")
+private val BULLET_PREFIX_REGEX = Regex("""(?m)^\s*[\uD83D\uDD39\u25AA\u2022\u25CF\u25E6]\s*""")
 private val MULTISPACE_REGEX = Regex("""\s{2,}""")
 private val ARABIC_DIACRITICS_REGEX = Regex("""[\u064B-\u065F\u0670\u06D6-\u06ED]""")
 private val ARABIC_ALEF_VARIANTS_REGEX = Regex("""[أإآٱ]""")
@@ -34,8 +34,8 @@ class LocalYomitanSource(
                 val tokens = normalizedQuery.split(' ').filter { it.isNotBlank() }
 
                 val ftsCandidates = buildGlossaryOnlyFtsQuery(query)
-                    ?.let { ftsQuery ->
-                        yomitanDao.searchGlossaryFts(ftsQuery, limit = 2500)
+                    ?.let { glossaryFtsQuery ->
+                        yomitanDao.searchGlossaryFts(glossaryFtsQuery, limit = 2500)
                     }
                     .orEmpty()
 
@@ -92,7 +92,6 @@ class LocalYomitanSource(
                 pagedRowsDirect = null
                 totalCountDirect = null
             } else {
-                // Fall back to a paged LIKE query. Use a separate COUNT so paging metadata stays correct.
                 pagedRowsDirect = yomitanDao.searchPaged(
                     term = query,
                     prefix = "${query}%",
@@ -110,15 +109,7 @@ class LocalYomitanSource(
             val pageRows = pagedRowsDirect ?: allRows.drop(offset).take(pageSize)
 
             SearchWordsResponse(
-                items = pageRows.map { row ->
-                    SearchItem(
-                        id = row.id,
-                        kana = row.reading,
-                        writings = listOf(Writing(text = row.expression)),
-                        meaningSummary = buildSearchPreview(row.glossary),
-                        jlpt = 0
-                    )
-                },
+                items = pageRows.map(::toSearchItem),
                 page = pageIndex,
                 pageCount = pageCount,
                 totalCount = totalCount
@@ -162,18 +153,46 @@ class LocalYomitanSource(
             if (categoriesJson.isBlank()) {
                 LoadCategoriesResponse()
             } else {
-                val type = object : TypeToken<List<CategoryRef>>() {}.type
-                LoadCategoriesResponse(categories = gson.fromJson(categoriesJson, type) ?: emptyList())
+                LoadCategoriesResponse(categories = parseCategoryRefs(categoriesJson))
             }
         }
     }
 
     override suspend fun loadCategory(id: Int, page: Int): Result<LoadCategoryResponse> {
-        return Result.success(
-            LoadCategoryResponse(
-                category = CategoryRef(id = id, name = "تصنيف محلي"),
-                members = SearchWordsResponse()
+        return runCatching {
+            val categories = loadCategories().getOrThrow().categories
+            val category = categories.firstOrNull { it.id == id } ?: CategoryRef(id = id, name = "تصنيف محلي")
+            val pageIndex = page.coerceAtLeast(0)
+            val pageSize = 80
+            val offset = pageIndex * pageSize
+            val totalCount = yomitanDao.countCategoryTerms(categoryId = id)
+            val pageCount = if (totalCount == 0) 0 else ((totalCount + pageSize - 1) / pageSize)
+            val pageRows = yomitanDao.loadCategoryTermsPaged(
+                categoryId = id,
+                limit = pageSize,
+                offset = offset
             )
+
+            LoadCategoryResponse(
+                category = category,
+                members = SearchWordsResponse(
+                    items = pageRows.map(::toSearchItem),
+                    page = pageIndex,
+                    pageCount = pageCount,
+                    totalCount = totalCount
+                )
+            )
+        }
+    }
+
+    private fun toSearchItem(row: YomitanTermEntity): SearchItem {
+        return SearchItem(
+            id = row.id,
+            kana = row.reading,
+            writings = listOf(Writing(text = row.expression)),
+            meaningSummary = buildSearchPreview(row.glossary),
+            jlpt = 0,
+            difficulty = row.difficulty
         )
     }
 
@@ -198,7 +217,7 @@ class LocalYomitanSource(
         if (text.isBlank()) return ""
         return text
             .replace(ARABIC_DIACRITICS_REGEX, "")
-            .replace("ـ", "") // tatweel
+            .replace("ـ", "")
             .replace(ARABIC_ALEF_VARIANTS_REGEX, "ا")
             .replace("ى", "ي")
             .replace("ؤ", "و")
@@ -223,7 +242,6 @@ class LocalYomitanSource(
         val wholeWord = Regex("""(^|\s)${Regex.escape(query)}(\s|$)""")
         if (wholeWord.containsMatchIn(glossary)) return 3
 
-        // Prefer earlier occurrences for partial matches.
         val index = glossary.indexOf(query)
         return if (index >= 0) 100 + index else Int.MAX_VALUE
     }
@@ -264,11 +282,17 @@ class LocalYomitanSource(
         val trimmed = raw.trim().trim('"', '\'', '`')
         if (trimmed.isBlank()) return null
 
-        // FTS query syntax is picky; keep it simple by stripping common operators.
         val cleaned = trimmed
             .replace(Regex("""[\*\^:\(\)\[\]{}!\\|&<>~]"""), "")
             .trim()
 
         return cleaned.takeIf { it.isNotBlank() }
+    }
+
+    private fun parseCategoryRefs(raw: String): List<CategoryRef> {
+        val array = gson.fromJson(raw, JsonArray::class.java) ?: return emptyList()
+        return array.mapNotNull { element ->
+            runCatching { gson.fromJson(element, CategoryRef::class.java) }.getOrNull()
+        }
     }
 }
