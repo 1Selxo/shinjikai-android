@@ -5,9 +5,17 @@
 Android app (Kotlin + Jetpack Compose) for Japanese to Arabic dictionary lookup using the Shinjikai API:  
 `https://shinjikai.app`
 
-## Disclaimer
+## 📱 Screenshots
 
-ℹ️ This app is an independent project and is not officially affiliated with Shinjikai.  
+<p align="center">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot-1.png" alt="Shinjikai search screen" width="260" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot-2.png" alt="Shinjikai word details screen" width="260" />
+</p>
+
+
+## ℹ️ Disclaimer
+
+This app is an independent project and is not officially affiliated with Shinjikai.  
 It uses the API provided by [shinjikai.app](https://shinjikai.app), and full credit for the dictionary data and its development goes to the Shinjikai website maintainers.
 
 ## ✨ Features
@@ -24,13 +32,6 @@ It uses the API provided by [shinjikai.app](https://shinjikai.app), and full cre
 - 🌐 Online mode (Shinjikai RPC API)
 - 📦 Offline mode with local Yomitan dictionary import
 - 🎨 Material 3 UI with dark/light theme support
-
-## 📱 Screenshots
-
-<p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot-1.png" alt="Shinjikai search screen" width="260" />
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot-2.png" alt="Shinjikai word details screen" width="260" />
-</p>
 
 ## 🧠 API Endpoints Used
 
