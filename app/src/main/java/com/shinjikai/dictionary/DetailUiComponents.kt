@@ -67,6 +67,11 @@ import java.util.Date
 
 private data class CategoryChipModel(val id: Int, val label: String)
 private data class MeaningEntry(val definition: String, val note: String)
+private data class DetailMeaningEntry(
+    val definition: String,
+    val note: String,
+    val imageUrls: List<String>
+)
 private data class GlossaryReference(val id: Int, val label: String)
 private data class DefinitionContent(val text: String, val references: List<GlossaryReference>)
 
@@ -128,9 +133,11 @@ fun DetailScreenBody(
             .orEmpty()
             .ifBlank { item.primaryWriting.ifBlank { "-" } }
         val kana = detailState.details?.word?.kana.orEmpty().ifBlank { item.kana.ifBlank { "-" } }
+        val notePrefix = stringResource(R.string.detail_note_prefix)
+        val meaningEntries = formatDetailMeaningEntries(detailState.details?.word?.meanings)
         val definitionContent = formatDefinition(
             meanings = detailState.details?.word?.meanings,
-            notePrefix = stringResource(R.string.detail_note_prefix),
+            notePrefix = notePrefix,
             enableGlossaryLinks = !useOfflineMode
         ).takeIf { it.text.isNotBlank() }
             ?: run {
@@ -206,23 +213,23 @@ fun DetailScreenBody(
             }
         )
 
-        DefinitionsCard(
-            title = stringResource(R.string.detail_definitions_title),
-            content = definitionContent,
-            onGlossaryReferenceClick = { referenceId ->
-                if (!useOfflineMode) {
-                    focusManager.clearFocus()
-                    viewModel.openOnlineGlossaryReference(referenceId)
+        if (meaningEntries.isNotEmpty()) {
+            MeaningEntriesCard(
+                title = stringResource(R.string.detail_definitions_title),
+                entries = meaningEntries,
+                notePrefix = notePrefix
+            )
+        } else {
+            DefinitionsCard(
+                title = stringResource(R.string.detail_definitions_title),
+                content = definitionContent,
+                onGlossaryReferenceClick = { referenceId ->
+                    if (!useOfflineMode) {
+                        focusManager.clearFocus()
+                        viewModel.openOnlineGlossaryReference(referenceId)
+                    }
                 }
-            }
-        )
-
-        val pictureUrls = detailState.details?.word?.meanings.orEmpty()
-            .flatMap(::extractMeaningPictureUrls)
-            .mapNotNull(::normalizeApiImageUrl)
-            .distinct()
-        if (pictureUrls.isNotEmpty()) {
-            PicturesCard(title = stringResource(R.string.detail_pictures_title), imageUrls = pictureUrls)
+            )
         }
 
         val relatedItems = (
@@ -238,7 +245,7 @@ fun DetailScreenBody(
             RelatedWordsCard(
                 title = stringResource(R.string.detail_related_words_title),
                 items = relatedItems,
-                expandAllByDefault = useOfflineMode,
+                expandAllByDefault = true,
                 onWordClick = {
                     focusManager.clearFocus()
                     viewModel.openDetailsByRelatedItem(it)
@@ -253,8 +260,8 @@ fun DetailScreenBody(
             ExamplesCard(
                 title = stringResource(R.string.detail_examples_title),
                 items = examples,
-                expandAllByDefault = useOfflineMode,
-                showAllByDefault = useOfflineMode
+                expandAllByDefault = true,
+                showAllByDefault = true
             )
         }
     }
@@ -351,6 +358,26 @@ private fun formatMeaningEntries(meanings: List<Meaning>?): List<MeaningEntry> {
         val definition = normalizeMeaningText(meaning.arabic)
         val note = normalizeMeaningNote(meaning.note)
         if (definition.isEmpty() && note.isEmpty()) null else MeaningEntry(definition.ifBlank { "-" }, note)
+    }
+}
+
+private fun formatDetailMeaningEntries(meanings: List<Meaning>?): List<DetailMeaningEntry> {
+    if (meanings.isNullOrEmpty()) return emptyList()
+    return meanings.mapNotNull { meaning ->
+        val definition = normalizeMeaningText(meaning.arabic)
+        val note = normalizeMeaningNote(meaning.note)
+        val imageUrls = extractMeaningPictureUrls(meaning)
+            .mapNotNull(::normalizeApiImageUrl)
+            .distinct()
+        if (definition.isEmpty() && note.isEmpty() && imageUrls.isEmpty()) {
+            null
+        } else {
+            DetailMeaningEntry(
+                definition = definition.ifBlank { "-" },
+                note = note,
+                imageUrls = imageUrls
+            )
+        }
     }
 }
 
@@ -598,6 +625,83 @@ private fun DefinitionsCard(
     }
 }
 
+@Composable
+private fun MeaningEntriesCard(
+    title: String,
+    entries: List<DetailMeaningEntry>,
+    notePrefix: String
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(text = title, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+            entries.forEachIndexed { index, entry ->
+                MeaningEntryCard(
+                    entryNumber = index + 1,
+                    entry = entry,
+                    notePrefix = notePrefix
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MeaningEntryCard(
+    entryNumber: Int,
+    entry: DetailMeaningEntry,
+    notePrefix: String
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "${entryNumber}.",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+            SelectionContainer {
+                Text(
+                    text = forceRtlText(entry.definition),
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textDirection = TextDirection.Rtl
+                    ),
+                    textAlign = TextAlign.Right,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            if (entry.note.isNotBlank()) {
+                SelectionContainer {
+                    Text(
+                        text = forceRtlText("$notePrefix${entry.note}"),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textDirection = TextDirection.Rtl
+                        ),
+                        textAlign = TextAlign.Right,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+            if (entry.imageUrls.isNotEmpty()) {
+                EntryPicturesRow(imageUrls = entry.imageUrls)
+            }
+        }
+    }
+}
+
 private fun stripGlossaryReferences(
     raw: String,
     enableGlossaryLinks: Boolean,
@@ -631,35 +735,21 @@ private fun stripGlossaryReferences(
 }
 
 @Composable
-private fun PicturesCard(title: String, imageUrls: List<String>) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(16.dp)
-            )
-            if (imageUrls.size == 1) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    PictureCard(url = imageUrls.first())
-                }
-            } else {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(imageUrls) { url ->
-                        PictureCard(url = url)
-                    }
-                }
+private fun EntryPicturesRow(imageUrls: List<String>) {
+    if (imageUrls.size == 1) {
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            PictureCard(url = imageUrls.first())
+        }
+    } else {
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(imageUrls) { url ->
+                PictureCard(url = url)
             }
         }
     }
