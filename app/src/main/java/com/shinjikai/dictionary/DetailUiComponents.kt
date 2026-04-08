@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,20 +19,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,6 +46,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipboardManager
@@ -51,14 +60,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
 import com.google.gson.JsonElement
-import com.google.gson.JsonObject
 import com.shinjikai.dictionary.data.Meaning
 import com.shinjikai.dictionary.data.RelatedWordItem
 import com.shinjikai.dictionary.data.SentenceExample
+import com.shinjikai.dictionary.data.extractPictureReference
 import com.shinjikai.dictionary.ui.DetailUiState
 import com.shinjikai.dictionary.ui.Screen
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
@@ -105,6 +115,7 @@ fun DetailScreenBody(
     viewModel: ShinjikaiViewModel
 ) {
     val item = detailState.selectedItem
+    var zoomedPictureUrl by remember { mutableStateOf<String?>(null) }
     val noReadingMessage = stringResource(R.string.detail_no_reading)
     val pronounceLabel = stringResource(R.string.detail_pronounce)
     val japaneseAudioUnavailableMessage = stringResource(R.string.detail_japanese_audio_unavailable)
@@ -217,7 +228,8 @@ fun DetailScreenBody(
             MeaningEntriesCard(
                 title = stringResource(R.string.detail_definitions_title),
                 entries = meaningEntries,
-                notePrefix = notePrefix
+                notePrefix = notePrefix,
+                onImageClick = { zoomedPictureUrl = it }
             )
         } else {
             DefinitionsCard(
@@ -262,6 +274,13 @@ fun DetailScreenBody(
                 items = examples,
                 expandAllByDefault = true,
                 showAllByDefault = true
+            )
+        }
+
+        zoomedPictureUrl?.let { imageUrl ->
+            ZoomableImageDialog(
+                imageUrl = imageUrl,
+                onDismiss = { zoomedPictureUrl = null }
             )
         }
     }
@@ -402,26 +421,7 @@ private fun extractMeaningPictureUrls(meaning: Meaning): List<String> {
 }
 
 private fun extractApiPictureUrl(element: JsonElement): String? {
-    return when {
-        element.isJsonNull -> null
-        element.isJsonPrimitive -> element.asJsonPrimitive.takeIf { it.isString }?.asString
-        element.isJsonObject -> extractApiPictureUrlFromObject(element.asJsonObject)
-        else -> null
-    }
-}
-
-private fun extractApiPictureUrlFromObject(obj: JsonObject): String? {
-    val keys = listOf("Filename", "FileName", "filename", "Url", "url", "Src", "src", "Path", "path")
-    for (key in keys) {
-        val value = obj.get(key) ?: continue
-        val asString = value.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString ?: continue
-        return if (key.equals("Filename", true) || key.equals("FileName", true)) {
-            "/static/word_pictures/${asString.trim()}"
-        } else {
-            asString
-        }
-    }
-    return null
+    return extractPictureReference(element)
 }
 
 internal fun forceRtlText(text: String): String = "\u202B$text\u202C"
@@ -629,7 +629,8 @@ private fun DefinitionsCard(
 private fun MeaningEntriesCard(
     title: String,
     entries: List<DetailMeaningEntry>,
-    notePrefix: String
+    notePrefix: String,
+    onImageClick: (String) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -645,7 +646,8 @@ private fun MeaningEntriesCard(
                 MeaningEntryCard(
                     entryNumber = index + 1,
                     entry = entry,
-                    notePrefix = notePrefix
+                    notePrefix = notePrefix,
+                    onImageClick = onImageClick
                 )
             }
         }
@@ -656,7 +658,8 @@ private fun MeaningEntriesCard(
 private fun MeaningEntryCard(
     entryNumber: Int,
     entry: DetailMeaningEntry,
-    notePrefix: String
+    notePrefix: String,
+    onImageClick: (String) -> Unit
 ) {
     Surface(
         shape = RoundedCornerShape(20.dp),
@@ -696,7 +699,10 @@ private fun MeaningEntryCard(
                 }
             }
             if (entry.imageUrls.isNotEmpty()) {
-                EntryPicturesRow(imageUrls = entry.imageUrls)
+                EntryPicturesRow(
+                    imageUrls = entry.imageUrls,
+                    onImageClick = onImageClick
+                )
             }
         }
     }
@@ -735,13 +741,16 @@ private fun stripGlossaryReferences(
 }
 
 @Composable
-private fun EntryPicturesRow(imageUrls: List<String>) {
+private fun EntryPicturesRow(
+    imageUrls: List<String>,
+    onImageClick: (String) -> Unit
+) {
     if (imageUrls.size == 1) {
         Box(
             modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.Center
         ) {
-            PictureCard(url = imageUrls.first())
+            PictureCard(url = imageUrls.first(), onClick = { onImageClick(imageUrls.first()) })
         }
     } else {
         LazyRow(
@@ -749,20 +758,22 @@ private fun EntryPicturesRow(imageUrls: List<String>) {
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(imageUrls) { url ->
-                PictureCard(url = url)
+                PictureCard(url = url, onClick = { onImageClick(url) })
             }
         }
     }
 }
 
 @Composable
-private fun PictureCard(url: String) {
+private fun PictureCard(url: String, onClick: () -> Unit) {
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
         ),
-        modifier = Modifier.size(width = 240.dp, height = 170.dp)
+        modifier = Modifier
+            .size(width = 240.dp, height = 170.dp)
+            .clickable(onClick = onClick)
     ) {
         Box(modifier = Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.Center) {
             SubcomposeAsyncImage(
@@ -779,6 +790,99 @@ private fun PictureCard(url: String) {
                     is coil.compose.AsyncImagePainter.State.Error -> Text(stringResource(R.string.detail_image_load_error))
                     else -> SubcomposeAsyncImageContent()
                 }
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+private fun ZoomableImageDialog(
+    imageUrl: String,
+    onDismiss: () -> Unit
+) {
+    var scale by remember(imageUrl) { mutableStateOf(1f) }
+    var offset by remember(imageUrl) { mutableStateOf(Offset.Zero) }
+
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding(),
+            shape = RoundedCornerShape(28.dp),
+            color = Color.Black.copy(alpha = 0.92f)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    IconButton(
+                        onClick = onDismiss,
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.14f),
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = stringResource(R.string.action_cancel))
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(420.dp)
+                        .clip(RoundedCornerShape(20.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    SubcomposeAsyncImage(
+                        model = imageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(imageUrl) {
+                                detectTransformGestures { centroid, pan, zoom, _ ->
+                                    val newScale = (scale * zoom).coerceIn(1f, 4f)
+                                    if (newScale == 1f) {
+                                        offset = Offset.Zero
+                                    } else {
+                                        offset += pan
+                                    }
+                                    scale = newScale
+                                }
+                            }
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = offset.x
+                                translationY = offset.y
+                            }
+                    ) {
+                        when (painter.state) {
+                            is coil.compose.AsyncImagePainter.State.Loading -> CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White
+                            )
+                            is coil.compose.AsyncImagePainter.State.Error -> Text(
+                                text = stringResource(R.string.detail_image_load_error),
+                                color = Color.White
+                            )
+                            else -> SubcomposeAsyncImageContent()
+                        }
+                    }
+                }
+                Text(
+                    text = stringResource(R.string.detail_pictures_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White.copy(alpha = 0.74f),
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
             }
         }
     }

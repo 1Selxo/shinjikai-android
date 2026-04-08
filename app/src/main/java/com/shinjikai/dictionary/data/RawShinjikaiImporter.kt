@@ -2,8 +2,6 @@ package com.shinjikai.dictionary.data
 
 import androidx.room.withTransaction
 import com.google.gson.Gson
-import com.google.gson.JsonElement
-import com.google.gson.JsonPrimitive
 import com.google.gson.annotations.SerializedName
 import java.io.File
 import kotlin.coroutines.coroutineContext
@@ -64,9 +62,7 @@ class RawShinjikaiImporter(
                             val normalizedWord = word.copy(
                                 meanings = word.meanings.map { meaning ->
                                     meaning.copy(
-                                        pictures = meaning.pictures.mapNotNull { picture ->
-                                            normalizePictureElement(picture)
-                                        }
+                                        pictures = meaning.pictures.mapNotNull(::normalizeStoredPictureElement)
                                     )
                                 }
                             )
@@ -161,24 +157,6 @@ class RawShinjikaiImporter(
             .joinToString(separator = " / ")
             .replace(Regex("""\s+"""), " ")
             .trim()
-    }
-
-    private fun normalizePictureElement(picture: JsonElement): JsonElement? {
-        if (picture.isJsonNull) return null
-        if (picture.isJsonPrimitive) {
-            val value = picture.asString.trim()
-            if (value.isBlank()) return null
-            return JsonPrimitive(value.replace('\\', '/'))
-        }
-        if (!picture.isJsonObject) return picture
-
-        val obj = picture.asJsonObject
-        val imageRef = sequenceOf("Filename", "FileName", "filename", "Url", "url", "Src", "src", "Path", "path")
-            .mapNotNull { key -> obj.get(key)?.takeIf { it.isJsonPrimitive }?.asString?.trim() }
-            .firstOrNull { it.isNotBlank() }
-            ?: return picture
-
-        return JsonPrimitive(imageRef.replace('\\', '/'))
     }
 }
 

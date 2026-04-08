@@ -2,7 +2,6 @@ package com.shinjikai.dictionary.ui
 
 import android.app.Application
 import android.net.Uri
-import android.os.Build
 import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.compose.runtime.getValue
@@ -33,11 +32,14 @@ import com.shinjikai.dictionary.data.SearchPagingSource
 import com.shinjikai.dictionary.data.SearchRequestSpec
 import com.shinjikai.dictionary.data.SettingsStore
 import com.shinjikai.dictionary.data.ShinjikaiRepository
-import com.shinjikai.dictionary.data.UpdateRepository
 import com.shinjikai.dictionary.data.WordDetailsResponse
 import com.shinjikai.dictionary.data.Writing
 import com.shinjikai.dictionary.data.YomitanMetaEntity
 import com.shinjikai.dictionary.data.YomitanImporter
+import com.shinjikai.dictionary.data.detectOfflineArchiveKind
+import com.shinjikai.dictionary.data.extractOfflineArchive
+import com.shinjikai.dictionary.data.extractTarXzStream
+import com.shinjikai.dictionary.data.extractZipStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -45,7 +47,6 @@ import java.util.zip.ZipInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -56,10 +57,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
-import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
@@ -69,17 +66,6 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     private val recentSearchStore = RecentSearchStore(context)
     private val bookmarkRepository = BookmarkRepository(database.bookmarkDao(), database.yomitanDao())
     private val clientId = ClientIdStore.getOrCreate(context)
-    private val installedVersionCode = runCatching {
-        val info = context.packageManager.getPackageInfo(context.packageName, 0)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode else {
-            @Suppress("DEPRECATION")
-            info.versionCode.toLong()
-        }
-    }.getOrDefault(1L)
-    private val updateRepository = UpdateRepository(
-        metadataUrl = APP_UPDATE_METADATA_URL,
-        fallbackUrl = APP_RELEASES_URL
-    )
     private val searchSpec = MutableStateFlow<SearchRequestSpec?>(null)
     private val searchRefreshNonce = MutableStateFlow(0)
     private var detailsLoadJob: Job? = null
@@ -120,9 +106,10 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     val bookmarkPagingFlow: Flow<PagingData<BookmarkItem>> =
         bookmarkRepository.pagedFlow().cachedIn(viewModelScope)
 
-    private val importClient = OkHttpClient()
     private val yomitanImporter = YomitanImporter(database)
     private val rawShinjikaiImporter = RawShinjikaiImporter(database)
+    var searchFocusNonce by mutableStateOf(0)
+        private set
 
     private data class OfflineImportResult(
         val importedCount: Int = 0,
@@ -172,9 +159,6 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     var offlineLastImportEpochMs by mutableStateOf<Long?>(null)
     var offlineTermCount by mutableStateOf(0)
     var offlineLastImportSource by mutableStateOf<String?>(null)
-    var isCheckingForUpdate by mutableStateOf(false)
-    var availableUpdate by mutableStateOf<com.shinjikai.dictionary.data.AppUpdateInfo?>(null)
-
     val searchUiState: SearchUiState
         get() = SearchUiState(
             term = term,
@@ -218,9 +202,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
             offlineImportStatus = offlineImportStatus,
             offlineLastImportEpochMs = offlineLastImportEpochMs,
             offlineTermCount = offlineTermCount,
-            offlineLastImportSource = offlineLastImportSource,
-            isCheckingForUpdate = isCheckingForUpdate,
-            availableUpdate = availableUpdate
+            offlineLastImportSource = offlineLastImportSource
         )
 
     init {
@@ -252,6 +234,19 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     fun navigateTo(screen: Screen) {
         screenStack.add(screen)
         currentScreen = screen
+    }
+
+    fun openPrimaryScreen(screen: Screen) {
+        screenStack.clear()
+        screenStack.add(screen)
+        currentScreen = screen
+        if (screen != Screen.Detail) {
+            detailsError = null
+        }
+    }
+
+    fun focusSearchField() {
+        searchFocusNonce += 1
     }
 
     fun goBack() {
@@ -534,46 +529,6 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setHasSeenIntroduction(false) }
     }
 
-    fun checkForAppUpdate() {
-        if (isCheckingForUpdate) return
-
-        viewModelScope.launch {
-            isCheckingForUpdate = true
-
-            val now = System.currentTimeMillis()
-            val result = updateRepository.checkForUpdate(installedVersionCode)
-            settingsStore.setLastUpdateCheckEpochMs(now)
-
-            result.onSuccess { update ->
-                availableUpdate = update
-                if (update == null) {
-                    Toast.makeText(
-                        context,
-                        context.getString(R.string.settings_updates_up_to_date),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                } else {
-                    Toast.makeText(
-                        context,
-                        context.getString(
-                            R.string.settings_updates_available_version,
-                            update.latestVersionName
-                        ),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }.onFailure { throwable ->
-                Toast.makeText(
-                    context,
-                    throwable.message ?: context.getString(R.string.settings_updates_check_failed),
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-
-            isCheckingForUpdate = false
-        }
-    }
-
     fun refreshOfflineTermCount() {
         viewModelScope.launch {
             val snapshot = withContext(Dispatchers.IO) {
@@ -667,62 +622,6 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         categoriesPreloadJob?.join()
     }
 
-    private suspend fun importFromRemoteZip(): Int {
-        return withContext(Dispatchers.IO) {
-            val dao = database.yomitanDao()
-            dao.deleteMeta(OFFLINE_IMAGE_DIR_META_KEY)
-            dao.deleteMeta(OFFLINE_CATEGORIES_META_KEY)
-            val tempDir = File(context.cacheDir, "offline-import").apply { mkdirs() }
-            val tempFile = File(tempDir, "offline_dictionary_import.zip.part")
-            if (tempFile.exists()) tempFile.delete()
-
-            val request = Request.Builder()
-                .url(OFFLINE_DICTIONARY_URL)
-                .build()
-
-            try {
-                importClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) error("HTTP ${response.code}")
-                    val body = response.body ?: error("No response body")
-                    val totalBytes = body.contentLength().takeIf { it > 0L } ?: -1L
-
-                    body.byteStream().use { input ->
-                        tempFile.outputStream().use { output ->
-                            val buffer = ByteArray(32 * 1024)
-                            var copied = 0L
-                            while (true) {
-                                ensureActive()
-                                val read = input.read(buffer)
-                                if (read < 0) break
-                                output.write(buffer, 0, read)
-                                copied += read
-                                if (totalBytes > 0L) {
-                                    val ratio = copied.toFloat() / totalBytes.toFloat()
-                                    offlineImportProgress = (ratio.coerceIn(0f, 1f) * 0.82f)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                ensureValidOfflineImportZip(tempFile)
-
-                offlineImportPhase = context.getString(R.string.offline_import_phase_index)
-                offlineImportProgress = offlineImportProgress.coerceAtLeast(0.86f)
-                val imported = FileInputStream(tempFile).use { stream ->
-                    yomitanImporter.importFromZip(
-                        zipStream = stream,
-                        sourceLabel = OFFLINE_DICTIONARY_SOURCE
-                    ).getOrThrow()
-                }
-                offlineImportProgress = 1f
-                imported
-            } finally {
-                if (tempFile.exists()) tempFile.delete()
-            }
-        }
-    }
-
     private suspend fun importFromPickedZip(uri: Uri): OfflineImportResult {
         return withContext(Dispatchers.IO) {
             val targetDir = File(context.cacheDir, "picked-import/extracted")
@@ -735,23 +634,10 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
                 offlineImportPhase = context.getString(R.string.offline_import_phase_index)
                 offlineImportProgress = 0.15f
                 context.contentResolver.openInputStream(uri)?.use { input ->
-                    ZipInputStream(input.buffered()).use { zip ->
-                        while (true) {
-                            val entry = zip.nextEntry ?: break
-                            val outFile = safeResolveZipEntry(targetDir, entry.name)
-                            if (entry.isDirectory) {
-                                outFile.mkdirs()
-                            } else {
-                                outFile.parentFile?.mkdirs()
-                                outFile.outputStream().use { output ->
-                                    zip.copyTo(output)
-                                }
-                            }
-                            zip.closeEntry()
-                        }
-                    }
+                    extractZipStream(input.buffered(), targetDir)
                 } ?: error("Unable to read selected zip.")
 
+                expandNestedOfflineArchives(targetDir)
                 processPickedImport(targetDir, PICKED_ZIP_SHINJIKAI_SOURCE)
             } finally {
                 if (targetDir.exists()) {
@@ -782,24 +668,10 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
                 offlineImportPhase = context.getString(R.string.offline_import_phase_index)
                 offlineImportProgress = 0.15f
                 context.contentResolver.openInputStream(uri)?.use { input ->
-                    XZCompressorInputStream(input.buffered()).use { xz ->
-                        TarArchiveInputStream(xz).use { tar ->
-                            while (true) {
-                                val entry = tar.nextTarEntry ?: break
-                                val outFile = safeResolveZipEntry(targetDir, entry.name)
-                                if (entry.isDirectory) {
-                                    outFile.mkdirs()
-                                } else {
-                                    outFile.parentFile?.mkdirs()
-                                    outFile.outputStream().use { output ->
-                                        tar.copyTo(output)
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    extractTarXzStream(input.buffered(), targetDir)
                 } ?: error("Unable to read selected archive.")
 
+                expandNestedOfflineArchives(targetDir)
                 processPickedImport(targetDir, PICKED_TXZ_SHINJIKAI_SOURCE)
             } finally {
                 if (targetDir.exists()) {
@@ -902,12 +774,39 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
             }
     }
 
-    private fun safeResolveZipEntry(rootDir: File, entryName: String): File {
-        val candidate = File(rootDir, entryName)
-        val rootPath = rootDir.canonicalFile.toPath()
-        val candidatePath = candidate.canonicalFile.toPath()
-        require(candidatePath.startsWith(rootPath)) { "Invalid zip entry path: $entryName" }
-        return candidate
+    private fun expandNestedOfflineArchives(rootDir: File) {
+        val expandedArchives = linkedSetOf<String>()
+        var passCount = 0
+        while (passCount < MAX_NESTED_ARCHIVE_PASSES) {
+            var expandedThisPass = false
+            passCount += 1
+
+            val archives = rootDir.walkTopDown()
+                .filter { file ->
+                    file.isFile &&
+                        generateSequence(file.parentFile) { it.parentFile }
+                            .none { it.name == NESTED_ARCHIVE_DIR_NAME } &&
+                        detectOfflineArchiveKind(file.name) != null
+                }
+                .sortedBy { it.absolutePath.length }
+                .toList()
+
+            archives.forEach { archive ->
+                val canonicalPath = archive.canonicalPath
+                if (!expandedArchives.add(canonicalPath)) return@forEach
+
+                val extractDir = File(archive.parentFile, NESTED_ARCHIVE_DIR_NAME)
+                    .resolve(archive.name.replace('.', '_'))
+                if (extractDir.exists()) {
+                    extractDir.deleteRecursively()
+                }
+                extractDir.mkdirs()
+                extractOfflineArchive(archive, extractDir)
+                expandedThisPass = true
+            }
+
+            if (!expandedThisPass) break
+        }
     }
 
     private fun Throwable.toImportFailureMessage(defaultMessage: String): String {
@@ -935,6 +834,15 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { recentSearchStore.save(snapshot) }
     }
 
+    fun removeRecentSearch(term: String) {
+        val normalized = term.trim()
+        if (normalized.isBlank()) return
+        if (recentSearches.removeAll { it.equals(normalized, ignoreCase = true) }) {
+            val snapshot = recentSearches.toList()
+            viewModelScope.launch { recentSearchStore.save(snapshot) }
+        }
+    }
+
     private fun ensureValidOfflineImportZip(file: File) {
         if (!file.exists() || file.length() <= 0L) {
             throw IOException(context.getString(R.string.offline_import_failure))
@@ -956,20 +864,10 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
 
     private companion object {
         private const val MAX_RECENT_SEARCHES = 15
+        private const val MAX_NESTED_ARCHIVE_PASSES = 3
+        private const val NESTED_ARCHIVE_DIR_NAME = "__offline_import_archives__"
         private const val OFFLINE_CATEGORIES_META_KEY = "categories_json"
-        private const val OFFLINE_DICTIONARY_SOURCE = "japanesearabic-yomitan-v2"
         private const val PICKED_ZIP_SHINJIKAI_SOURCE = "raw-shinjikai-jp-ar-picked-zip"
         private const val PICKED_TXZ_SHINJIKAI_SOURCE = "raw-shinjikai-jp-ar-picked-tar-xz"
-        private const val LOCAL_RAW_SHINJIKAI_SOURCE = "raw-shinjikai-jp-ar-jsonl"
-        private const val LOCAL_RAW_SHINJIKAI_JSONL_PATH =
-            "C:\\Users\\almag\\Desktop\\Raw Shinjikai Database\\content\\Raw Shinjikai JP-AR Database\\raw_shinjikai_data.jsonl"
-        private const val LOCAL_RAW_SHINJIKAI_IMAGES_PATH =
-            "C:\\Users\\almag\\Desktop\\Raw Shinjikai Database\\content\\Raw Shinjikai JP-AR Database\\yomitan_images"
-        private const val OFFLINE_DICTIONARY_URL =
-            "https://raw.githubusercontent.com/a-hamdi/japanesearabic/main/data/YomitandictionaryV2/%E6%B7%B1%E8%BE%9E%E6%B5%B7_No_Examples_No_%E4%BE%8B%E6%96%87%20-%20JP-AR%20STYLING%20FIX.zip"
-        private const val APP_UPDATE_METADATA_URL =
-            "https://raw.githubusercontent.com/obj44/shinjikai/main/update.json"
-        private const val APP_RELEASES_URL =
-            "https://github.com/obj44/shinjikai/releases/latest"
     }
 }

@@ -31,8 +31,13 @@
     <string name="detail_commonness_label">الشيوع %1$s</string>
 
     <string name="search_hint">اكتب باليابانية أو العربية أو بالرومـاجي</string>
+    <string name="search_recent_title">عمليات البحث الأخيرة</string>
+    <string name="search_recent_subtitle">اختر منها أو امسح ما لا تحتاجه</string>
     <string name="search_clear_history">مسح سجل البحث</string>
+    <string name="search_remove_history">حذف هذا البحث</string>
     <string name="search_no_results">لا توجد نتائج</string>
+    <string name="history_title">سجل البحث</string>
+    <string name="history_empty">لا توجد عمليات بحث محفوظة بعد.</string>
     <string name="intro_app_name">قاموس شِنجِكاي 深辞海</string>
     <string name="intro_title">القاموس الياباني العربي الكبير</string>
     <string name="intro_page_1_eyebrow">الخطوة 1</string>
@@ -73,14 +78,6 @@
     <string name="settings_offline_archives_title">تنزيل ملفات القاموس</string>
     <string name="settings_offline_archives_description">افتح صفحة الإصدار لتحميل أرشيف النص أو أرشيف الصور ثم استوردهما داخل التطبيق.</string>
     <string name="settings_offline_archives_open">فتح صفحة تنزيل القاموس</string>
-    <string name="settings_updates_title">تحديثات التطبيق</string>
-    <string name="settings_updates_idle">يمكنك التحقق من توفر إصدار جديد من هنا.</string>
-    <string name="settings_updates_check_now">التحقق من التحديثات</string>
-    <string name="settings_updates_checking">جاري التحقق...</string>
-    <string name="settings_updates_up_to_date">أنت تستخدم أحدث إصدار متاح.</string>
-    <string name="settings_updates_available_version">توفر الإصدار %1$s.</string>
-    <string name="settings_updates_open">فتح صفحة التحديث</string>
-    <string name="settings_updates_check_failed">تعذّر التحقق من التحديثات.</string>
     <string name="settings_onboarding_title">المقدمة</string>
     <string name="settings_onboarding_description">إذا أردت مشاهدة الشرح التعريفي مرة أخرى، يمكنك فتحه من هنا في أي وقت.</string>
     <string name="settings_onboarding_show_again">عرض المقدمة مرة أخرى</string>

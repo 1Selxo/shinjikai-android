@@ -50,13 +50,14 @@ class BookmarkRepository(
 
     suspend fun upsertWithDetails(item: SearchItem, details: WordDetailsResponse) {
         val createdAt = bookmarkDao.getCreatedAt(item.id) ?: System.currentTimeMillis()
+        val normalizedDetails = details.withCanonicalPictureElements()
         bookmarkDao.upsert(
             BookmarkEntity(
                 id = item.id,
                 primaryWriting = item.primaryWriting,
                 kana = item.kana,
                 meaningSummary = item.meaningSummary,
-                detailsJson = gson.toJson(details),
+                detailsJson = gson.toJson(normalizedDetails),
                 detailsSavedAt = System.currentTimeMillis(),
                 createdAt = createdAt
             )

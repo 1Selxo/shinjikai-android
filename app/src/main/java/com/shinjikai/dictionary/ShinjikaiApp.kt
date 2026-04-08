@@ -7,6 +7,16 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.speech.tts.TextToSpeech
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -230,56 +240,147 @@ fun ShinjikaiApp(
                         onOpenOfflineSetup = viewModel::dismissIntroductionAndOpenSettings
                     )
                 } else {
-                    when (currentScreen) {
-                        Screen.Search -> SearchScreenContent(
-                            appName = appName,
-                            useOfflineMode = settings.useOfflineMode,
-                            hasOfflineDictionary = viewModel.settingsUiState.offlineTermCount > 0,
-                            viewModel = viewModel,
-                            uiState = viewModel.searchUiState,
-                            searchResults = viewModel.searchResults,
-                            onNavigateTo = viewModel::navigateTo,
-                            onOpenDetails = {
-                                focusManager.clearFocus()
-                                viewModel.openDetails(it)
+                    AnimatedContent(
+                        targetState = currentScreen,
+                        transitionSpec = {
+                            when {
+                                initialState == Screen.Search && targetState == Screen.Detail -> {
+                                    (fadeIn(animationSpec = tween(180, delayMillis = 60)) +
+                                        slideInVertically(animationSpec = tween(220)) { it / 18 }) togetherWith
+                                        (fadeOut(animationSpec = tween(140)) +
+                                            slideOutVertically(animationSpec = tween(180)) { it / 10 })
+                                }
+                                initialState == Screen.Detail && targetState == Screen.Search -> {
+                                    (fadeIn(animationSpec = tween(180)) +
+                                        slideInVertically(animationSpec = tween(220)) { -it / 18 }) togetherWith
+                                        (fadeOut(animationSpec = tween(140)) +
+                                            slideOutVertically(animationSpec = tween(180)) { -it / 10 })
+                                }
+                                else -> {
+                                    fadeIn(animationSpec = tween(160)) togetherWith
+                                        fadeOut(animationSpec = tween(120))
+                                }
                             }
-                        )
-                        Screen.Bookmarks -> BookmarksScreenContent(
-                            viewModel = viewModel,
-                            uiState = viewModel.bookmarksUiState,
-                            bookmarkFlow = viewModel.bookmarkPagingFlow,
-                            onGoBack = viewModel::goBack
-                        )
-                        Screen.Settings -> SettingsScreenContent(
-                            appVersionLabel = appVersionLabel,
-                            supportsDynamicColor = supportsDynamicColor,
-                            uiState = viewModel.settingsUiState,
-                            viewModel = viewModel,
-                            onGoBack = viewModel::goBack
-                        )
-                        Screen.LocalDictionary -> LocalDictionaryScreenContent(
-                            uiState = viewModel.settingsUiState,
-                            onPickOfflineZip = {
-                                pickOfflineZipLauncher.launch(
-                                    arrayOf(
-                                        "application/zip",
-                                        "application/x-xz",
-                                        "application/x-gtar",
-                                        "application/octet-stream",
-                                        "*/*"
+                        },
+                        label = "screen-transition"
+                    ) { screen ->
+                        when (screen) {
+                            Screen.Search -> SearchScreenContent(
+                                appName = appName,
+                                useOfflineMode = settings.useOfflineMode,
+                                hasOfflineDictionary = viewModel.settingsUiState.offlineTermCount > 0,
+                                searchFocusNonce = viewModel.searchFocusNonce,
+                                viewModel = viewModel,
+                                uiState = viewModel.searchUiState,
+                                searchResults = viewModel.searchResults,
+                                onSearchClick = {
+                                    viewModel.openPrimaryScreen(Screen.Search)
+                                    viewModel.focusSearchField()
+                                },
+                                onHistoryClick = {
+                                    focusManager.clearFocus()
+                                    viewModel.openPrimaryScreen(Screen.History)
+                                },
+                                onBookmarksClick = {
+                                    focusManager.clearFocus()
+                                    viewModel.openPrimaryScreen(Screen.Bookmarks)
+                                },
+                                onSettingsClick = {
+                                    focusManager.clearFocus()
+                                    viewModel.openPrimaryScreen(Screen.Settings)
+                                },
+                                onOpenDetails = {
+                                    focusManager.clearFocus()
+                                    viewModel.openDetails(it)
+                                }
+                            )
+                            Screen.History -> HistoryScreenContent(
+                                uiState = viewModel.searchUiState,
+                                viewModel = viewModel,
+                                onSearchClick = {
+                                    viewModel.openPrimaryScreen(Screen.Search)
+                                    viewModel.focusSearchField()
+                                },
+                                onHistoryClick = {
+                                    focusManager.clearFocus()
+                                    viewModel.openPrimaryScreen(Screen.History)
+                                },
+                                onBookmarksClick = {
+                                    focusManager.clearFocus()
+                                    viewModel.openPrimaryScreen(Screen.Bookmarks)
+                                },
+                                onSettingsClick = {
+                                    focusManager.clearFocus()
+                                    viewModel.openPrimaryScreen(Screen.Settings)
+                                }
+                            )
+                            Screen.Bookmarks -> BookmarksScreenContent(
+                                viewModel = viewModel,
+                                uiState = viewModel.bookmarksUiState,
+                                bookmarkFlow = viewModel.bookmarkPagingFlow,
+                                onSearchClick = {
+                                    viewModel.openPrimaryScreen(Screen.Search)
+                                    viewModel.focusSearchField()
+                                },
+                                onHistoryClick = {
+                                    focusManager.clearFocus()
+                                    viewModel.openPrimaryScreen(Screen.History)
+                                },
+                                onBookmarksClick = {
+                                    focusManager.clearFocus()
+                                    viewModel.openPrimaryScreen(Screen.Bookmarks)
+                                },
+                                onSettingsClick = {
+                                    focusManager.clearFocus()
+                                    viewModel.openPrimaryScreen(Screen.Settings)
+                                }
+                            )
+                            Screen.Settings -> SettingsScreenContent(
+                                appVersionLabel = appVersionLabel,
+                                supportsDynamicColor = supportsDynamicColor,
+                                uiState = viewModel.settingsUiState,
+                                viewModel = viewModel,
+                                onSearchClick = {
+                                    viewModel.openPrimaryScreen(Screen.Search)
+                                    viewModel.focusSearchField()
+                                },
+                                onHistoryClick = {
+                                    focusManager.clearFocus()
+                                    viewModel.openPrimaryScreen(Screen.History)
+                                },
+                                onBookmarksClick = {
+                                    focusManager.clearFocus()
+                                    viewModel.openPrimaryScreen(Screen.Bookmarks)
+                                },
+                                onSettingsClick = {
+                                    focusManager.clearFocus()
+                                    viewModel.openPrimaryScreen(Screen.Settings)
+                                }
+                            )
+                            Screen.LocalDictionary -> LocalDictionaryScreenContent(
+                                uiState = viewModel.settingsUiState,
+                                onPickOfflineZip = {
+                                    pickOfflineZipLauncher.launch(
+                                        arrayOf(
+                                            "application/zip",
+                                            "application/x-xz",
+                                            "application/x-gtar",
+                                            "application/octet-stream",
+                                            "*/*"
+                                        )
                                     )
-                                )
-                            },
-                            onGoBack = viewModel::goBack
-                        )
-                        Screen.Detail -> DetailScreenContent(
-                            useOfflineMode = settings.useOfflineMode,
-                            canSpeakJapanese = canSpeakJapanese,
-                            textToSpeech = textToSpeech,
-                            clipboardManager = clipboardManager,
-                            focusManager = focusManager,
-                            viewModel = viewModel
-                        )
+                                },
+                                onGoBack = viewModel::goBack
+                            )
+                            Screen.Detail -> DetailScreenContent(
+                                useOfflineMode = settings.useOfflineMode,
+                                canSpeakJapanese = canSpeakJapanese,
+                                textToSpeech = textToSpeech,
+                                clipboardManager = clipboardManager,
+                                focusManager = focusManager,
+                                viewModel = viewModel
+                            )
+                        }
                     }
                 }
 

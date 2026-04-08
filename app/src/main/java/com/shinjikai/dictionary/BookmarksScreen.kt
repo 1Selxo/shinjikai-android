@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -60,7 +62,10 @@ fun BookmarksScreenContent(
     viewModel: ShinjikaiViewModel,
     uiState: BookmarksUiState,
     bookmarkFlow: Flow<PagingData<BookmarkItem>>,
-    onGoBack: () -> Unit
+    onSearchClick: () -> Unit,
+    onHistoryClick: () -> Unit,
+    onBookmarksClick: () -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     val bookmarks = bookmarkFlow.collectAsLazyPagingItems()
     val locale = Locale.getDefault()
@@ -91,6 +96,7 @@ fun BookmarksScreenContent(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {
@@ -101,14 +107,6 @@ fun BookmarksScreenContent(
                             stringResource(R.string.bookmarks_title)
                         }
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onGoBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.nav_back)
-                        )
-                    }
                 },
                 actions = {
                     if (uiState.isEditMode) {
@@ -146,28 +144,29 @@ fun BookmarksScreenContent(
             )
         }
     ) { padding ->
-        if (bookmarks.loadState.refresh is LoadState.NotLoading && bookmarks.itemCount == 0) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                Text(
-                    text = stringResource(R.string.bookmarks_empty),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (bookmarks.loadState.refresh is LoadState.NotLoading && bookmarks.itemCount == 0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    Text(
+                        text = stringResource(R.string.bookmarks_empty),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(start = 16.dp, top = 10.dp, end = 16.dp, bottom = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                 items(
                     count = bookmarks.itemCount,
                     key = { index -> bookmarks[index]?.id ?: "bookmark-$index" }
@@ -264,7 +263,19 @@ fun BookmarksScreenContent(
                         }
                     }
                 }
+                }
             }
+
+            PrimaryBottomBar(
+                currentScreen = com.shinjikai.dictionary.ui.Screen.Bookmarks,
+                onSearchClick = onSearchClick,
+                onHistoryClick = onHistoryClick,
+                onBookmarksClick = onBookmarksClick,
+                onSettingsClick = onSettingsClick,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+            )
         }
 
         uiState.pendingDeletionIds?.let { ids ->

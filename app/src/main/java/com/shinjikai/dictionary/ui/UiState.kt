@@ -1,7 +1,6 @@
 package com.shinjikai.dictionary.ui
 
 import com.shinjikai.dictionary.data.AppSettings
-import com.shinjikai.dictionary.data.AppUpdateInfo
 import com.shinjikai.dictionary.data.BookmarkItem
 import com.shinjikai.dictionary.data.SearchItem
 import com.shinjikai.dictionary.data.WordDetailsResponse
@@ -43,7 +42,5 @@ data class SettingsUiState(
     val offlineImportStatus: String? = null,
     val offlineLastImportEpochMs: Long? = null,
     val offlineTermCount: Int = 0,
-    val offlineLastImportSource: String? = null,
-    val isCheckingForUpdate: Boolean = false,
-    val availableUpdate: AppUpdateInfo? = null
+    val offlineLastImportSource: String? = null
 )
