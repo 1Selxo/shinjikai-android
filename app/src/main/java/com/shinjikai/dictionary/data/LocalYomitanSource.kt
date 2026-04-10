@@ -9,6 +9,8 @@ private val MULTISPACE_REGEX = Regex("""\s{2,}""")
 private val ARABIC_DIACRITICS_REGEX = Regex("""[\u064B-\u065F\u0670\u06D6-\u06ED]""")
 private val ARABIC_ALEF_VARIANTS_REGEX = Regex("""[أإآٱ]""")
 private val NON_LETTER_NUMBER_SPACE_REGEX = Regex("""[^\p{L}\p{N}\s]""")
+private val SENTENCE_SPLIT_REGEX = Regex("""[\s\u3000,،;；、。.!?！？()\[\]{}<>\"“”'‘’/\\]+""")
+private val JAPANESE_PARTICLES = listOf("から", "まで", "より", "だけ", "ほど", "など", "って", "では", "には", "は", "が", "を", "に", "で", "と", "へ", "も", "や", "か", "の")
 
 class LocalYomitanSource(
     private val yomitanDao: YomitanDao,
@@ -23,8 +25,9 @@ class LocalYomitanSource(
 
         return runCatching {
             val isArabic = isArabicQuery(query)
+            val japaneseSearchSegments = if (!isArabic) extractSearchSegments(query) else emptyList()
             val japaneseSearchCandidates = if (!isArabic) buildJapaneseSearchCandidates(query) else emptyList()
-            val ftsQuery = if (!isArabic) buildGenericFtsQuery(query) else null
+            val ftsQueries = if (!isArabic) buildGenericFtsQueries(query) else emptyList()
 
             val allRows: List<YomitanTermEntity>
             val pagedRowsDirect: List<YomitanTermEntity>?
@@ -75,15 +78,20 @@ class LocalYomitanSource(
                     .toList()
                 pagedRowsDirect = null
                 totalCountDirect = null
-            } else if (ftsQuery != null) {
+            } else if (ftsQueries.isNotEmpty()) {
                 val desiredCandidates = ((pageIndex + 1) * pageSize * 5).coerceAtLeast(250)
-                val ftsRows = yomitanDao.searchFts(
-                    matchQuery = ftsQuery,
-                    limit = desiredCandidates.coerceAtMost(2500)
-                )
+                val perQueryLimit = (desiredCandidates / ftsQueries.size).coerceAtLeast(pageSize).coerceAtMost(1000)
+                val ftsRows = ftsQueries
+                    .flatMap { ftsQuery ->
+                        yomitanDao.searchFts(
+                            matchQuery = ftsQuery,
+                            limit = perQueryLimit
+                        )
+                    }
                 allRows = ftsRows
                     .sortedWith(
-                        compareBy<YomitanTermEntity> { rankJapaneseQuery(japaneseSearchCandidates, it) }
+                        compareByDescending<YomitanTermEntity> { scoreJapaneseSegmentMatches(japaneseSearchSegments, it) }
+                            .thenBy { rankJapaneseQuery(japaneseSearchCandidates, it) }
                             .thenBy { it.id }
                     )
                     .distinctBy { row ->
@@ -261,37 +269,117 @@ class LocalYomitanSource(
         return candidates.size * 10 + 4
     }
 
-    private fun buildGenericFtsQuery(rawQuery: String): String? {
-        val tokens = rawQuery.trim()
-            .split(Regex("""\s+"""))
-            .mapNotNull { token ->
-                val variants = JapaneseDeinflector.generateCandidates(token)
-                    .mapNotNull(::sanitizeFtsToken)
-                    .distinct()
-                when {
-                    variants.isEmpty() -> null
-                    variants.size == 1 -> "${variants.first()}*"
-                    else -> variants.joinToString(
-                        separator = " OR ",
-                        prefix = "(",
-                        postfix = ")"
-                    ) { "$it*" }
-                }
-            }
+    private fun buildGenericFtsQueries(rawQuery: String): List<String> {
+        return extractSearchSegments(rawQuery)
+            .mapNotNull(::buildSegmentFtsQuery)
             .distinct()
-
-        if (tokens.isEmpty()) return null
-        return tokens.joinToString(separator = " AND ")
     }
 
     private fun buildJapaneseSearchCandidates(rawQuery: String): List<String> {
-        return rawQuery.trim()
-            .split(Regex("""\s+"""))
+        return extractSearchSegments(rawQuery)
             .asSequence()
-            .filter { it.isNotBlank() }
-            .flatMap { token -> JapaneseDeinflector.generateCandidates(token).asSequence() }
+            .flatMap { token -> expandJapaneseTokenVariants(token).asSequence() }
             .distinct()
             .toList()
+    }
+
+    private fun buildSegmentFtsQuery(token: String): String? {
+        val variants = expandJapaneseTokenVariants(token)
+            .mapNotNull(::sanitizeFtsToken)
+            .distinct()
+
+        return when {
+            variants.isEmpty() -> null
+            variants.size == 1 -> "${variants.first()}*"
+            else -> variants.joinToString(
+                separator = " OR ",
+                prefix = "(",
+                postfix = ")"
+            ) { "$it*" }
+        }
+    }
+
+    private fun extractSearchSegments(rawQuery: String): List<String> {
+        return rawQuery.trim()
+            .split(SENTENCE_SPLIT_REGEX)
+            .asSequence()
+            .filter { it.isNotBlank() }
+            .flatMap { token -> splitJapaneseSentenceToken(token).asSequence() }
+            .distinct()
+            .toList()
+    }
+
+    private fun splitJapaneseSentenceToken(token: String): List<String> {
+        if (token.isBlank()) return emptyList()
+        if (!token.any(::isJapaneseCharacter)) return listOf(token)
+
+        val parts = mutableListOf<String>()
+        var index = 0
+        var segmentStart = 0
+
+        while (index < token.length) {
+            val particle = JAPANESE_PARTICLES.firstOrNull { candidate ->
+                token.startsWith(candidate, index) &&
+                    index > segmentStart &&
+                    index + candidate.length < token.length &&
+                    isJapaneseCharacter(token[index - 1]) &&
+                    isJapaneseCharacter(token[index + candidate.length])
+            }
+
+            if (particle != null) {
+                token.substring(segmentStart, index)
+                    .takeIf { it.isNotBlank() }
+                    ?.let(parts::add)
+                index += particle.length
+                segmentStart = index
+            } else {
+                index += 1
+            }
+        }
+
+        token.substring(segmentStart)
+            .takeIf { it.isNotBlank() }
+            ?.let(parts::add)
+
+        return if (parts.isEmpty()) listOf(token) else parts
+    }
+
+    private fun expandJapaneseTokenVariants(token: String): List<String> {
+        if (token.isBlank()) return emptyList()
+
+        val variants = linkedSetOf<String>()
+        variants.addAll(JapaneseDeinflector.generateCandidates(token))
+
+        val trailingKanaLength = token.reversed().takeWhile(::isKana).length
+        if (trailingKanaLength in 1 until token.length) {
+            val stem = token.dropLast(trailingKanaLength)
+            val trailingKana = token.takeLast(trailingKanaLength)
+            val trailingVariants = JapaneseDeinflector.generateCandidates(trailingKana)
+            if (shouldSearchBareStem(token, stem, trailingKanaLength, trailingVariants)) {
+                variants.add(stem)
+            }
+            variants.addAll(trailingVariants)
+            trailingVariants.forEach { variants.add(stem + it) }
+        }
+
+        return variants.toList()
+    }
+
+    private fun scoreJapaneseSegmentMatches(segments: List<String>, row: YomitanTermEntity): Int {
+        if (segments.isEmpty()) return 0
+        return segments.sumOf { segment ->
+            expandJapaneseTokenVariants(segment).maxOfOrNull { variant ->
+                when {
+                    row.expression == variant -> 120
+                    row.reading == variant -> 110
+                    row.expression.startsWith(variant) -> 80
+                    row.reading.startsWith(variant) -> 70
+                    row.expression.contains(variant) -> 40
+                    row.reading.contains(variant) -> 30
+                    else -> 0
+                }
+            } ?: 0
+        }
     }
 
     private fun buildGlossaryOnlyFtsQuery(rawQuery: String): String? {
@@ -313,6 +401,27 @@ class LocalYomitanSource(
             .trim()
 
         return cleaned.takeIf { it.isNotBlank() }
+    }
+
+    private fun isJapaneseCharacter(ch: Char): Boolean {
+        return ch in '\u3040'..'\u30FF' || ch in '\u3400'..'\u9FFF' || ch == '々'
+    }
+
+    private fun isKana(ch: Char): Boolean {
+        return ch in '\u3040'..'\u30FF'
+    }
+
+    private fun shouldSearchBareStem(
+        token: String,
+        stem: String,
+        trailingKanaLength: Int,
+        trailingVariants: List<String>
+    ): Boolean {
+        if (stem.isBlank()) return false
+        if (trailingKanaLength < 2) return false
+        if (!stem.any { !isKana(it) }) return false
+        val trailingKana = token.takeLast(trailingKanaLength)
+        return trailingVariants.any { it != trailingKana }
     }
 
     private fun parseCategoryRefs(raw: String): List<CategoryRef> {

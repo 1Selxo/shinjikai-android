@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -82,6 +83,7 @@ fun SearchScreenContent(
 ) {
     val focusManager = LocalFocusManager.current
     val lazyResults = searchResults.collectAsLazyPagingItems()
+    val resultsListState = rememberLazyListState()
     val searchFocusRequester = remember { FocusRequester() }
     var isSearchFieldFocused by remember { mutableStateOf(false) }
     var isSearchFieldReady by remember { mutableStateOf(false) }
@@ -98,6 +100,10 @@ fun SearchScreenContent(
         if (searchFocusNonce > 0 && isSearchFieldReady) {
             searchFocusRequester.requestFocus()
         }
+    }
+
+    LaunchedEffect(uiState.term, uiState.resultMode, uiState.activeCategoryId, useOfflineMode) {
+        resultsListState.scrollToItem(0)
     }
 
     Scaffold(
@@ -263,11 +269,12 @@ fun SearchScreenContent(
                     }
 
                     else -> {
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(vertical = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
+                            LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                state = resultsListState,
+                                contentPadding = PaddingValues(vertical = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                             items(
                                 count = lazyResults.itemCount,
                                 key = { index -> lazyResults[index]?.id ?: "result-$index" }

@@ -71,11 +71,12 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     private val searchRefreshNonce = MutableStateFlow(0)
     private var detailsLoadJob: Job? = null
     private var categoriesPreloadJob: Job? = null
+    private var activeUseOfflineMode = settingsStore.readCached().useOfflineMode
 
     val settings: StateFlow<AppSettings> = settingsStore.settingsFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, settingsStore.readCached())
 
-    private var dictionarySource: DictionarySource = createDictionarySource(settings.value.useOfflineMode)
+    private var dictionarySource: DictionarySource = createDictionarySource(activeUseOfflineMode)
         set(value) {
             field = value
             repository = ShinjikaiRepository(source = value)
@@ -212,7 +213,10 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
 
         viewModelScope.launch {
             settings.collect { newSettings ->
-                dictionarySource = createDictionarySource(newSettings.useOfflineMode)
+                if (activeUseOfflineMode != newSettings.useOfflineMode) {
+                    activeUseOfflineMode = newSettings.useOfflineMode
+                    dictionarySource = createDictionarySource(newSettings.useOfflineMode)
+                }
                 ensureCategoriesPreloadedIfNeeded()
             }
         }
@@ -506,6 +510,10 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setUseOfflineMode(enabled: Boolean) {
+        if (activeUseOfflineMode != enabled) {
+            activeUseOfflineMode = enabled
+            dictionarySource = createDictionarySource(enabled)
+        }
         viewModelScope.launch { settingsStore.setUseOfflineMode(enabled) }
     }
 

@@ -347,7 +347,7 @@ private fun OfflineImporterCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
@@ -356,15 +356,15 @@ private fun OfflineImporterCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(44.dp)
                         .background(
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                            shape = RoundedCornerShape(16.dp)
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                            shape = RoundedCornerShape(14.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -376,7 +376,7 @@ private fun OfflineImporterCard(
                 }
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = stringResource(R.string.settings_local_dictionary),
@@ -392,8 +392,8 @@ private fun OfflineImporterCard(
 
             Text(
                 text = summaryText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.74f)
             )
 
             ImporterMetricRow(
@@ -555,8 +555,8 @@ private fun ImporterMetricRow(
     subtitle: String
 ) {
     Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
     ) {
         Column(
             modifier = Modifier
@@ -566,13 +566,14 @@ private fun ImporterMetricRow(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.74f)
             )
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.84f)
             )
         }
     }
@@ -590,7 +591,7 @@ private fun StatusMessage(
     val icon = if (isError) Icons.Filled.ErrorOutline else Icons.Filled.CheckCircle
 
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         color = background
     ) {
         Row(
