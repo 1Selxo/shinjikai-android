@@ -38,6 +38,8 @@
     <string name="search_no_results">لا توجد نتائج</string>
     <string name="history_title">سجل البحث</string>
     <string name="history_empty">لا توجد عمليات بحث محفوظة بعد.</string>
+    <string name="history_delete_confirm_title">حذف من السجل؟</string>
+    <string name="history_delete_confirm_message">سيتم حذف "%1$s" من سجل البحث.</string>
     <string name="intro_app_name">قاموس شِنجِكاي 深辞海</string>
     <string name="intro_title">القاموس الياباني العربي الكبير</string>
     <string name="intro_page_1_eyebrow">الخطوة 1</string>
@@ -109,4 +111,6 @@
     <string name="settings_attribution_title">&#x0645;&#x0635;&#x062F;&#x0631; &#x0627;&#x0644;&#x0628;&#x064A;&#x0627;&#x0646;&#x0627;&#x062A;</string>
     <string name="settings_attribution_description">&#x064A;&#x0639;&#x062A;&#x0645;&#x062F; &#x0627;&#x0644;&#x0628;&#x062D;&#x062B; &#x0648;&#x062A;&#x0641;&#x0627;&#x0635;&#x064A;&#x0644; &#x0627;&#x0644;&#x0643;&#x0644;&#x0645;&#x0627;&#x062A; &#x0639;&#x0644;&#x0649; API &#x0627;&#x0644;&#x0645;&#x0642;&#x062F;&#x0645;&#x0629; &#x0645;&#x0646; Shinjikai.</string>
     <string name="settings_attribution_open">&#x0641;&#x062A;&#x062D; &#x0645;&#x0648;&#x0642;&#x0639; Shinjikai</string>
+    <string name="history_clear_all_confirm_title">حذف كل سجل البحث؟</string>
+    <string name="history_clear_all_confirm_message">سيتم حذف جميع عمليات البحث المحفوظة.</string>
 </resources>

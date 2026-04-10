@@ -40,6 +40,7 @@ import com.shinjikai.dictionary.data.detectOfflineArchiveKind
 import com.shinjikai.dictionary.data.extractOfflineArchive
 import com.shinjikai.dictionary.data.extractTarXzStream
 import com.shinjikai.dictionary.data.extractZipStream
+import com.shinjikai.dictionary.data.findOfflineImportPayload
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -682,23 +683,10 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun processPickedImport(targetDir: File, sourceLabel: String): OfflineImportResult {
-        val jsonlFile = targetDir
-            .walkTopDown()
-            .filter { it.isFile && it.name.equals("raw_shinjikai_data.jsonl", ignoreCase = true) }
-            .minByOrNull { it.absolutePath.length }
-        val extractedImagesDir = targetDir
-            .walkTopDown()
-            .filter { it.isDirectory && it.name.equals("yomitan_images", ignoreCase = true) }
-            .minByOrNull { it.absolutePath.length }
-        val yomitanDirectory = targetDir
-            .walkTopDown()
-            .filter { file ->
-                file.isFile &&
-                    file.name.lowercase().startsWith("term_bank_") &&
-                    file.extension.equals("json", ignoreCase = true)
-            }
-            .map { it.parentFile }
-            .firstOrNull()
+        val payload = findOfflineImportPayload(targetDir)
+        val jsonlFile = payload.jsonlFile
+        val extractedImagesDir = payload.extractedImagesDir
+        val yomitanDirectory = payload.yomitanDirectory
 
         require(jsonlFile != null || extractedImagesDir != null || yomitanDirectory != null) {
             "Selected archive does not contain dictionary text, Yomitan term banks, or yomitan_images."

@@ -23,6 +23,7 @@ class LocalYomitanSource(
 
         return runCatching {
             val isArabic = isArabicQuery(query)
+            val japaneseSearchCandidates = if (!isArabic) buildJapaneseSearchCandidates(query) else emptyList()
             val ftsQuery = if (!isArabic) buildGenericFtsQuery(query) else null
 
             val allRows: List<YomitanTermEntity>
@@ -82,7 +83,7 @@ class LocalYomitanSource(
                 )
                 allRows = ftsRows
                     .sortedWith(
-                        compareBy<YomitanTermEntity> { rankJapaneseQuery(query, it) }
+                        compareBy<YomitanTermEntity> { rankJapaneseQuery(japaneseSearchCandidates, it) }
                             .thenBy { it.id }
                     )
                     .distinctBy { row ->
@@ -246,26 +247,51 @@ class LocalYomitanSource(
         return if (index >= 0) 100 + index else Int.MAX_VALUE
     }
 
-    private fun rankJapaneseQuery(query: String, row: YomitanTermEntity): Int {
-        val q = query.trim()
-        if (q.isBlank()) return Int.MAX_VALUE
-        return when {
-            row.expression == q -> 0
-            row.reading == q -> 1
-            row.expression.startsWith(q) -> 2
-            row.reading.startsWith(q) -> 3
-            else -> 4
+    private fun rankJapaneseQuery(candidates: List<String>, row: YomitanTermEntity): Int {
+        if (candidates.isEmpty()) return Int.MAX_VALUE
+        candidates.forEachIndexed { index, candidate ->
+            val baseRank = index * 10
+            when {
+                row.expression == candidate -> return baseRank
+                row.reading == candidate -> return baseRank + 1
+                row.expression.startsWith(candidate) -> return baseRank + 2
+                row.reading.startsWith(candidate) -> return baseRank + 3
+            }
         }
+        return candidates.size * 10 + 4
     }
 
     private fun buildGenericFtsQuery(rawQuery: String): String? {
         val tokens = rawQuery.trim()
             .split(Regex("""\s+"""))
-            .mapNotNull { token -> sanitizeFtsToken(token)?.let { "$it*" } }
+            .mapNotNull { token ->
+                val variants = JapaneseDeinflector.generateCandidates(token)
+                    .mapNotNull(::sanitizeFtsToken)
+                    .distinct()
+                when {
+                    variants.isEmpty() -> null
+                    variants.size == 1 -> "${variants.first()}*"
+                    else -> variants.joinToString(
+                        separator = " OR ",
+                        prefix = "(",
+                        postfix = ")"
+                    ) { "$it*" }
+                }
+            }
             .distinct()
 
         if (tokens.isEmpty()) return null
         return tokens.joinToString(separator = " AND ")
+    }
+
+    private fun buildJapaneseSearchCandidates(rawQuery: String): List<String> {
+        return rawQuery.trim()
+            .split(Regex("""\s+"""))
+            .asSequence()
+            .filter { it.isNotBlank() }
+            .flatMap { token -> JapaneseDeinflector.generateCandidates(token).asSequence() }
+            .distinct()
+            .toList()
     }
 
     private fun buildGlossaryOnlyFtsQuery(rawQuery: String): String? {

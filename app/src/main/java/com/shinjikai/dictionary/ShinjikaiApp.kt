@@ -45,8 +45,10 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -233,6 +235,14 @@ fun ShinjikaiApp(
     MaterialTheme(colorScheme = colorScheme, typography = appTypography) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
             BackHandler(enabled = screenStack.size > 1) { viewModel.goBack() }
+            val handleSearchTabClick = {
+                if (viewModel.currentScreen == Screen.Search) {
+                    viewModel.focusSearchField()
+                } else {
+                    focusManager.clearFocus()
+                    viewModel.openPrimaryScreen(Screen.Search)
+                }
+            }
             Surface(color = MaterialTheme.colorScheme.background) {
                 if (viewModel.settingsUiState.showIntroduction) {
                     IntroductionScreen(
@@ -273,10 +283,7 @@ fun ShinjikaiApp(
                                 viewModel = viewModel,
                                 uiState = viewModel.searchUiState,
                                 searchResults = viewModel.searchResults,
-                                onSearchClick = {
-                                    viewModel.openPrimaryScreen(Screen.Search)
-                                    viewModel.focusSearchField()
-                                },
+                                onSearchClick = handleSearchTabClick,
                                 onHistoryClick = {
                                     focusManager.clearFocus()
                                     viewModel.openPrimaryScreen(Screen.History)
@@ -297,10 +304,7 @@ fun ShinjikaiApp(
                             Screen.History -> HistoryScreenContent(
                                 uiState = viewModel.searchUiState,
                                 viewModel = viewModel,
-                                onSearchClick = {
-                                    viewModel.openPrimaryScreen(Screen.Search)
-                                    viewModel.focusSearchField()
-                                },
+                                onSearchClick = handleSearchTabClick,
                                 onHistoryClick = {
                                     focusManager.clearFocus()
                                     viewModel.openPrimaryScreen(Screen.History)
@@ -318,10 +322,7 @@ fun ShinjikaiApp(
                                 viewModel = viewModel,
                                 uiState = viewModel.bookmarksUiState,
                                 bookmarkFlow = viewModel.bookmarkPagingFlow,
-                                onSearchClick = {
-                                    viewModel.openPrimaryScreen(Screen.Search)
-                                    viewModel.focusSearchField()
-                                },
+                                onSearchClick = handleSearchTabClick,
                                 onHistoryClick = {
                                     focusManager.clearFocus()
                                     viewModel.openPrimaryScreen(Screen.History)
@@ -340,10 +341,7 @@ fun ShinjikaiApp(
                                 supportsDynamicColor = supportsDynamicColor,
                                 uiState = viewModel.settingsUiState,
                                 viewModel = viewModel,
-                                onSearchClick = {
-                                    viewModel.openPrimaryScreen(Screen.Search)
-                                    viewModel.focusSearchField()
-                                },
+                                onSearchClick = handleSearchTabClick,
                                 onHistoryClick = {
                                     focusManager.clearFocus()
                                     viewModel.openPrimaryScreen(Screen.History)
@@ -592,14 +590,35 @@ private fun DetailScreenContent(
             TopAppBar(
                 title = { Text(stringResource(R.string.detail_title)) },
                 navigationIcon = {
-                    IconButton(onClick = viewModel::goBack) {
+                    FilledTonalIconButton(
+                        onClick = viewModel::goBack,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
                         Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.nav_back))
                     }
                 },
                 actions = {
-                    IconButton(onClick = { item?.let(viewModel::toggleBookmark) }) {
+                    val isBookmarked = detailState.isBookmarked
+                    FilledTonalIconButton(
+                        onClick = { item?.let(viewModel::toggleBookmark) },
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = if (isBookmarked) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            },
+                            contentColor = if (isBookmarked) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    ) {
                         Icon(
-                            imageVector = if (detailState.isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                            imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
                             contentDescription = stringResource(R.string.nav_bookmarks)
                         )
                     }

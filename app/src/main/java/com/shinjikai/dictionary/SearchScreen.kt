@@ -45,6 +45,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -83,6 +84,7 @@ fun SearchScreenContent(
     val lazyResults = searchResults.collectAsLazyPagingItems()
     val searchFocusRequester = remember { FocusRequester() }
     var isSearchFieldFocused by remember { mutableStateOf(false) }
+    var isSearchFieldReady by remember { mutableStateOf(false) }
     var showOfflineDownloadPrompt by remember { mutableStateOf(false) }
 
     val refreshState = lazyResults.loadState.refresh
@@ -92,8 +94,8 @@ fun SearchScreenContent(
     val showLanding = !hasActiveSearch && uiState.term.isBlank() && !isRefreshing && refreshError == null
     val showNoResults = hasActiveSearch && uiState.term.isNotBlank() && lazyResults.itemCount == 0 && !isRefreshing && refreshError == null
 
-    LaunchedEffect(searchFocusNonce) {
-        if (searchFocusNonce > 0) {
+    LaunchedEffect(searchFocusNonce, isSearchFieldReady) {
+        if (searchFocusNonce > 0 && isSearchFieldReady) {
             searchFocusRequester.requestFocus()
         }
     }
@@ -135,6 +137,9 @@ fun SearchScreenContent(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .focusRequester(searchFocusRequester)
+                                    .onGloballyPositioned {
+                                        isSearchFieldReady = true
+                                    }
                                     .onFocusChanged { state -> isSearchFieldFocused = state.isFocused },
                                 singleLine = true,
                                 label = { Text(stringResource(R.string.search_hint)) },
