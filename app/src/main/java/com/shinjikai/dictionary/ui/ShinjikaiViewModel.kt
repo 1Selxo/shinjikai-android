@@ -241,6 +241,12 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         currentScreen = screen
     }
 
+    fun openSearchScreen() {
+        if (currentScreen != Screen.Search) {
+            navigateTo(Screen.Search)
+        }
+    }
+
     fun openPrimaryScreen(screen: Screen) {
         screenStack.clear()
         screenStack.add(screen)
@@ -261,6 +267,14 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
             if (currentScreen != Screen.Detail) {
                 detailsError = null
             }
+        }
+    }
+
+    fun goBackOrOpenPrimary(screen: Screen) {
+        if (screenStack.size > 1) {
+            goBack()
+        } else {
+            openPrimaryScreen(screen)
         }
     }
 

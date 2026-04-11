@@ -179,6 +179,7 @@ fun ShinjikaiApp(
             viewModel.currentScreen = Screen.Search
             viewModel.term = incoming
             viewModel.runSearchForTerm(incoming)
+            viewModel.focusSearchField()
             onExternalSearchTermConsumed()
         }
     }
@@ -246,7 +247,8 @@ fun ShinjikaiApp(
                     viewModel.focusSearchField()
                 } else {
                     focusManager.clearFocus()
-                    viewModel.openPrimaryScreen(Screen.Search)
+                    viewModel.openSearchScreen()
+                    viewModel.focusSearchField()
                 }
             }
             Surface(color = MaterialTheme.colorScheme.background) {
@@ -289,14 +291,9 @@ fun ShinjikaiApp(
                                 viewModel = viewModel,
                                 uiState = viewModel.searchUiState,
                                 searchResults = viewModel.searchResults,
-                                onSearchClick = handleSearchTabClick,
-                                onHistoryClick = {
+                                onBackClick = {
                                     focusManager.clearFocus()
-                                    viewModel.openPrimaryScreen(Screen.History)
-                                },
-                                onBookmarksClick = {
-                                    focusManager.clearFocus()
-                                    viewModel.openPrimaryScreen(Screen.Bookmarks)
+                                    viewModel.goBackOrOpenPrimary(Screen.Bookmarks)
                                 },
                                 onSettingsClick = {
                                     focusManager.clearFocus()

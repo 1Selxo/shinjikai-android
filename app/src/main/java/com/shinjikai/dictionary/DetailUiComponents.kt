@@ -213,8 +213,9 @@ fun DetailScreenBody(
                 }
             },
             onCategoryClick = { chip ->
-                viewModel.navigateTo(Screen.Search)
+                viewModel.openSearchScreen()
                 focusManager.clearFocus()
+                viewModel.focusSearchField()
                 viewModel.runCategorySearch(chip.id, chip.label)
             },
             onKanjiClick = {
@@ -676,38 +677,30 @@ private fun buildAnkiNoteContent(
     meaning: String,
     examples: List<SentenceExample>
 ): com.shinjikai.dictionary.integration.AnkiNoteContent {
-    val front = buildString {
-        append(kanji.ifBlank { kana })
-        if (kana.isNotBlank() && kana != "-" && kana != kanji) {
-            append("\n")
-            append(kana)
-        }
-    }.trim()
-
     val cleanedMeaning = meaning.lineSequence()
         .map { it.trim() }
         .filter { it.isNotEmpty() && it != "-" }
         .joinToString("\n")
 
     val primaryExample = examples.firstOrNull()
-    val back = buildString {
-        append(cleanedMeaning.ifBlank { "-" })
-        if (primaryExample != null) {
-            val exampleText = primaryExample.text.ifBlank { primaryExample.kana }
+    val example = buildString {
+        primaryExample?.let {
+            val exampleText = it.text.ifBlank { it.kana }.trim()
             if (exampleText.isNotBlank()) {
-                append("\n\n")
                 append(exampleText)
             }
-            if (primaryExample.arabic.isNotBlank()) {
-                append("\n")
-                append(primaryExample.arabic)
+            if (it.arabic.isNotBlank()) {
+                if (isNotEmpty()) append("\n")
+                append(it.arabic.trim())
             }
         }
     }.trim()
 
     return com.shinjikai.dictionary.integration.AnkiNoteContent(
-        front = front.ifBlank { "-" },
-        back = back.ifBlank { "-" }
+        expression = kanji.ifBlank { kana }.ifBlank { "-" },
+        reading = kana.takeIf { it.isNotBlank() && it != "-" && it != kanji }.orEmpty(),
+        meaning = cleanedMeaning.ifBlank { "-" },
+        example = example
     )
 }
 

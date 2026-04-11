@@ -148,7 +148,8 @@ fun HistoryScreenContent(
                                     .fillMaxWidth()
                                     .clickable {
                                         viewModel.term = historyTerm
-                                        viewModel.openPrimaryScreen(com.shinjikai.dictionary.ui.Screen.Search)
+                                        viewModel.openSearchScreen()
+                                        viewModel.focusSearchField()
                                         viewModel.runSearch()
                                     }
                                     .padding(horizontal = 14.dp, vertical = 12.dp),

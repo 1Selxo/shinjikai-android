@@ -4,10 +4,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -24,8 +28,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -55,12 +61,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.shinjikai.dictionary.data.SearchItem
 import com.shinjikai.dictionary.ui.ResultMode
-import com.shinjikai.dictionary.ui.Screen
 import com.shinjikai.dictionary.ui.SearchUiState
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
 import kotlinx.coroutines.flow.Flow
@@ -75,9 +81,7 @@ fun SearchScreenContent(
     viewModel: ShinjikaiViewModel,
     uiState: SearchUiState,
     searchResults: Flow<PagingData<SearchItem>>,
-    onSearchClick: () -> Unit,
-    onHistoryClick: () -> Unit,
-    onBookmarksClick: () -> Unit,
+    onBackClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onOpenDetails: (SearchItem) -> Unit
 ) {
@@ -85,7 +89,6 @@ fun SearchScreenContent(
     val lazyResults = searchResults.collectAsLazyPagingItems()
     val resultsListState = rememberLazyListState()
     val searchFocusRequester = remember { FocusRequester() }
-    var isSearchFieldFocused by remember { mutableStateOf(false) }
     var isSearchFieldReady by remember { mutableStateOf(false) }
     var showOfflineDownloadPrompt by remember { mutableStateOf(false) }
 
@@ -95,6 +98,23 @@ fun SearchScreenContent(
     val refreshError = (refreshState as? LoadState.Error)?.error?.message?.takeIf { hasActiveSearch }
     val showLanding = !hasActiveSearch && uiState.term.isBlank() && !isRefreshing && refreshError == null
     val showNoResults = hasActiveSearch && uiState.term.isNotBlank() && lazyResults.itemCount == 0 && !isRefreshing && refreshError == null
+    val landingSuggestions = remember {
+        listOf(
+            "猫",
+            "学校",
+            "食べる",
+            "電車",
+            "友達",
+            "水",
+            "先生",
+            "日本語",
+            "かわいい",
+            "勉強",
+            "本",
+            "旅行",
+            "海"
+        ).shuffled().take(7)
+    }
 
     LaunchedEffect(searchFocusNonce, isSearchFieldReady) {
         if (searchFocusNonce > 0 && isSearchFieldReady) {
@@ -110,119 +130,93 @@ fun SearchScreenContent(
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text(appName) }
-            )
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (uiState.activeCategoryName != null) {
-                    CategorySearchBanner(
-                        label = uiState.activeCategoryName.orEmpty(),
-                        onClear = {
-                            viewModel.clearCategorySearch()
-                            focusManager.clearFocus()
-                        }
-                    )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedTextField(
-                                value = uiState.term,
-                                onValueChange = { viewModel.term = it },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .focusRequester(searchFocusRequester)
-                                    .onGloballyPositioned {
-                                        isSearchFieldReady = true
-                                    }
-                                    .onFocusChanged { state -> isSearchFieldFocused = state.isFocused },
-                                singleLine = true,
-                                label = { Text(stringResource(R.string.search_hint)) },
-                                shape = RoundedCornerShape(20.dp),
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                keyboardActions = KeyboardActions(
-                                    onSearch = {
-                                        focusManager.clearFocus()
-                                        viewModel.runSearch()
-                                    }
-                                ),
-                                trailingIcon = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        if (uiState.term.isNotEmpty()) {
-                                            IconButton(
-                                                onClick = {
-                                                    viewModel.term = ""
-                                                    searchFocusRequester.requestFocus()
-                                                }
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Close,
-                                                    contentDescription = stringResource(R.string.nav_clear)
-                                                )
-                                            }
-                                        }
-                                        IconButton(
-                                            onClick = {
-                                                focusManager.clearFocus()
-                                                viewModel.runSearch()
-                                            }
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Search,
-                                                contentDescription = stringResource(R.string.nav_search)
-                                            )
-                                        }
-                                    }
-                                },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            )
-                        }
-
-                        SearchModeTabs(
-                            useOfflineMode = useOfflineMode,
-                            onModeSelected = { selectedOffline ->
-                                if (selectedOffline && !hasOfflineDictionary) {
-                                    showOfflineDownloadPrompt = true
-                                } else if (selectedOffline != useOfflineMode) {
-                                    viewModel.setUseOfflineMode(selectedOffline)
-                                }
-                            }
+                title = { Text(stringResource(R.string.nav_search)) },
+                navigationIcon = {
+                    FilledTonalIconButton(
+                        onClick = onBackClick,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.nav_back)
                         )
                     }
                 }
-
-                if (isRefreshing) {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+            )
+        },
+        bottomBar = {
+            SearchBottomDock(
+                term = uiState.term,
+                useOfflineMode = useOfflineMode,
+                activeCategoryName = uiState.activeCategoryName,
+                onTermChange = { viewModel.term = it },
+                onRunSearch = {
+                    focusManager.clearFocus()
+                    viewModel.runSearch()
+                },
+                onClearTerm = {
+                    viewModel.runSearchForTerm("")
+                    searchFocusRequester.requestFocus()
+                },
+                onClearCategory = {
+                    viewModel.clearCategorySearch()
+                    searchFocusRequester.requestFocus()
+                },
+                onModeSelected = { selectedOffline ->
+                    if (selectedOffline && !hasOfflineDictionary) {
+                        showOfflineDownloadPrompt = true
+                    } else if (selectedOffline != useOfflineMode) {
+                        viewModel.setUseOfflineMode(selectedOffline)
                     }
+                },
+                focusRequester = searchFocusRequester,
+                onFieldReady = { isSearchFieldReady = true },
+                onFocusChanged = { }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (isRefreshing) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
                 }
+            }
 
-                refreshError?.let { message ->
-                    Text(text = message, color = MaterialTheme.colorScheme.error)
-                }
+            refreshError?.let { message ->
+                Text(text = message, color = MaterialTheme.colorScheme.error)
+            }
 
-                when {
-                    showLanding -> {
+            when {
+                showLanding -> {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(18.dp)
+                    ) {
+                        LandingSuggestions(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(if (useOfflineMode && uiState.offlinePreviewItems.isNotEmpty()) 0.58f else 1f),
+                            appName = appName,
+                            suggestions = landingSuggestions,
+                            onSuggestionClick = { suggestion ->
+                                viewModel.term = suggestion
+                                focusManager.clearFocus()
+                                viewModel.runSearchForTerm(suggestion)
+                            }
+                        )
+
                         if (useOfflineMode && uiState.offlinePreviewItems.isNotEmpty()) {
                             LazyColumn(
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(0.42f),
                                 contentPadding = PaddingValues(vertical = 4.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
@@ -236,120 +230,121 @@ fun SearchScreenContent(
                                     )
                                 }
                             }
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = appName,
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
                         }
                     }
+                }
 
-                    showNoResults -> {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(),
-                            contentAlignment = Alignment.TopCenter
-                        ) {
-                            Text(
-                                text = stringResource(R.string.search_no_results),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
-                                style = MaterialTheme.typography.bodyMedium
+                showNoResults -> {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = stringResource(R.string.search_no_results),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center
+                        )
+                        if (!useOfflineMode && uiState.activeCategoryId == null) {
+                            LandingSuggestions(
+                                modifier = Modifier.fillMaxWidth(),
+                                appName = appName,
+                                suggestions = landingSuggestions,
+                                title = "جرّب كلمات أخرى",
+                                onSuggestionClick = { suggestion ->
+                                    viewModel.term = suggestion
+                                    focusManager.clearFocus()
+                                    viewModel.runSearchForTerm(suggestion)
+                                }
                             )
                         }
                     }
+                }
 
-                    else -> {
-                            LazyColumn(
-                                modifier = Modifier.weight(1f),
-                                state = resultsListState,
-                                contentPadding = PaddingValues(vertical = 4.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        state = resultsListState,
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(
+                            count = lazyResults.itemCount,
+                            key = { index -> lazyResults[index]?.id ?: "result-$index" }
+                        ) { index ->
+                            val item = lazyResults[index] ?: return@items
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onOpenDetails(item) },
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                             ) {
-                            items(
-                                count = lazyResults.itemCount,
-                                key = { index -> lazyResults[index]?.id ?: "result-$index" }
-                            ) { index ->
-                                val item = lazyResults[index] ?: return@items
-                                Card(
+                                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp)) {
+                                    Text(
+                                        text = item.kana,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = item.primaryWriting.ifBlank { item.kana },
+                                            style = MaterialTheme.typography.headlineMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        CommonnessBadge(difficulty = item.difficulty)
+                                    }
+                                    Text(
+                                        text = forceRtlText(
+                                            if (useOfflineMode) {
+                                                formatOfflineSearchPreview(item.meaningSummary)
+                                            } else {
+                                                formatOnlineSearchPreview(item.meaningSummary)
+                                            }
+                                        ),
+                                        style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Rtl),
+                                        textAlign = TextAlign.Right,
+                                        maxLines = if (useOfflineMode || uiState.activeCategoryId != null) 1 else Int.MAX_VALUE,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (lazyResults.loadState.append is LoadState.Loading) {
+                            item(key = "append-loading") {
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { onOpenDetails(item) },
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp)) {
-                                        Text(
-                                            text = item.kana,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
-                                        )
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = item.primaryWriting.ifBlank { item.kana },
-                                                style = MaterialTheme.typography.headlineMedium,
-                                                fontWeight = FontWeight.SemiBold,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            CommonnessBadge(difficulty = item.difficulty)
-                                        }
-                                        Text(
-                                            text = forceRtlText(
-                                                if (useOfflineMode) {
-                                                    formatOfflineSearchPreview(item.meaningSummary)
-                                                } else {
-                                                    formatOnlineSearchPreview(item.meaningSummary)
-                                                }
-                                            ),
-                                            style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Rtl),
-                                            textAlign = TextAlign.Right,
-                                            maxLines = if (useOfflineMode || uiState.activeCategoryId != null) 1 else Int.MAX_VALUE,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = 6.dp)
-                                        )
-                                    }
+                                    CircularProgressIndicator()
                                 }
                             }
+                        }
 
-                            if (lazyResults.loadState.append is LoadState.Loading) {
-                                item(key = "append-loading") {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 8.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CircularProgressIndicator()
-                                    }
-                                }
-                            }
-
-                            (lazyResults.loadState.append as? LoadState.Error)?.let { appendError ->
-                                item(key = "append-error") {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 8.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        TextButton(onClick = { lazyResults.retry() }) {
-                                            Text(appendError.error.message ?: stringResource(R.string.detail_retry))
-                                        }
+                        (lazyResults.loadState.append as? LoadState.Error)?.let { appendError ->
+                            item(key = "append-error") {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    TextButton(onClick = { lazyResults.retry() }) {
+                                        Text(appendError.error.message ?: stringResource(R.string.detail_retry))
                                     }
                                 }
                             }
@@ -357,18 +352,6 @@ fun SearchScreenContent(
                     }
                 }
             }
-
-            PrimaryBottomBar(
-                currentScreen = Screen.Search,
-                isSearchFocused = isSearchFieldFocused,
-                onSearchClick = onSearchClick,
-                onHistoryClick = onHistoryClick,
-                onBookmarksClick = onBookmarksClick,
-                onSettingsClick = onSettingsClick,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-            )
         }
     }
 
@@ -393,6 +376,151 @@ fun SearchScreenContent(
                 }
             }
         )
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun SearchBottomDock(
+    term: String,
+    useOfflineMode: Boolean,
+    activeCategoryName: String?,
+    onTermChange: (String) -> Unit,
+    onRunSearch: () -> Unit,
+    onClearTerm: () -> Unit,
+    onClearCategory: () -> Unit,
+    onModeSelected: (Boolean) -> Unit,
+    focusRequester: FocusRequester,
+    onFieldReady: () -> Unit,
+    onFocusChanged: (androidx.compose.ui.focus.FocusState) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        activeCategoryName?.let {
+            CategorySearchBanner(
+                label = it,
+                onClear = onClearCategory
+            )
+        }
+
+        if (activeCategoryName == null) {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
+                tonalElevation = 2.dp
+            ) {
+                SearchModeTabs(
+                    useOfflineMode = useOfflineMode,
+                    onModeSelected = onModeSelected
+                )
+            }
+        }
+
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 4.dp,
+            shadowElevation = 10.dp
+        ) {
+            OutlinedTextField(
+                value = term,
+                onValueChange = onTermChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
+                    .onGloballyPositioned { onFieldReady() }
+                    .onFocusChanged(onFocusChanged),
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.search_hint)) },
+                shape = RoundedCornerShape(28.dp),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onRunSearch() }),
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = stringResource(R.string.nav_search)
+                    )
+                },
+                trailingIcon = {
+                    if (term.isNotEmpty()) {
+                        IconButton(onClick = onClearTerm) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.nav_clear)
+                            )
+                        }
+                    }
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun LandingSuggestions(
+    modifier: Modifier = Modifier,
+    appName: String,
+    suggestions: List<String>,
+    title: String = "جرّب كلمات يابانية مثل",
+    onSuggestionClick: (String) -> Unit
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = appName,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                textAlign = TextAlign.Center
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                suggestions.forEach { suggestion ->
+                    Surface(
+                        onClick = { onSuggestionClick(suggestion) },
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+                        tonalElevation = 2.dp
+                    ) {
+                        Text(
+                            text = suggestion,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
