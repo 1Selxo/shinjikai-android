@@ -36,7 +36,7 @@ class BookmarkRepository(
     }
 
     suspend fun upsert(item: SearchItem) {
-        val createdAt = bookmarkDao.getCreatedAt(item.id) ?: System.currentTimeMillis()
+        val createdAt = bookmarkDao.getCreatedAt(item.id) ?: java.util.Date().time
         bookmarkDao.upsert(
             BookmarkEntity(
                 id = item.id,
@@ -49,7 +49,7 @@ class BookmarkRepository(
     }
 
     suspend fun upsertWithDetails(item: SearchItem, details: WordDetailsResponse) {
-        val createdAt = bookmarkDao.getCreatedAt(item.id) ?: System.currentTimeMillis()
+        val createdAt = bookmarkDao.getCreatedAt(item.id) ?: java.util.Date().time
         val normalizedDetails = details.withCanonicalPictureElements()
         bookmarkDao.upsert(
             BookmarkEntity(
@@ -58,12 +58,11 @@ class BookmarkRepository(
                 kana = item.kana,
                 meaningSummary = item.meaningSummary,
                 detailsJson = gson.toJson(normalizedDetails),
-                detailsSavedAt = System.currentTimeMillis(),
+                detailsSavedAt = java.util.Date().time,
                 createdAt = createdAt
             )
         )
     }
-
     suspend fun getSavedDetails(id: Int): WordDetailsResponse? {
         val json = bookmarkDao.getDetailsJsonById(id)?.trim().orEmpty()
         if (json.isBlank()) return null

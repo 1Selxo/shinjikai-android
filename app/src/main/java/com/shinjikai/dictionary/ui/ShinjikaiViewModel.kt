@@ -256,7 +256,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
 
     fun goBack() {
         if (screenStack.size > 1) {
-            screenStack.removeLast()
+            screenStack.removeAt(screenStack.lastIndex)
             currentScreen = screenStack.last()
             if (currentScreen != Screen.Detail) {
                 detailsError = null
@@ -429,7 +429,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
 
                 detailsResult.onSuccess { response ->
                     val existingCreatedAt = bookmarkedItems.firstOrNull { it.id == item.id }?.createdAt
-                        ?: System.currentTimeMillis()
+                        ?: java.util.Date().time
                     val word = response.word
                     val summaryFromDetails = word.meanings
                         .asSequence()

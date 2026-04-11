@@ -11,5 +11,5 @@ data class BookmarkEntity(
     val meaningSummary: String,
     val detailsJson: String? = null,
     val detailsSavedAt: Long? = null,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = java.util.Date().time
 )

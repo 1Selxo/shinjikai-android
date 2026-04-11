@@ -67,6 +67,7 @@ class RawShinjikaiImporter(
                                 }
                             )
 
+
                             val details = WordDetailsResponse(
                                 word = normalizedWord,
                                 similarWords = record.similarWords.map {

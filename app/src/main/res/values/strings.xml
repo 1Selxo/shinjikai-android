@@ -1,8 +1,8 @@
 <resources>
     <string name="app_name">قاموس شِنجِكاي</string>
     <string name="nav_back">رجوع</string>
-    <string name="nav_bookmarks">المحفوظات</string>
-    <string name="nav_settings">الإعدادات</string>
+    <string name="nav_bookmarks" comment="Navigation label for bookmarks">المحفوظات</string>
+    <string name="nav_settings" comment="Navigation label for settings">الإعدادات</string>
     <string name="nav_clear">مسح</string>
     <string name="nav_search">بحث</string>
 
@@ -56,7 +56,7 @@
     <string name="intro_action_skip">تخطّ المقدمة</string>
     <string name="intro_action_offline_setup">الذهاب إلى إعداد القاموس المحلي</string>
 
-    <string name="bookmarks_title">المحفوظات</string>
+    <string name="bookmarks_title" comment="Title for the bookmarks screen">المحفوظات</string>
     <string name="bookmarks_selected_count">%1$d محدد</string>
     <string name="bookmarks_select_all">تحديد الكل</string>
     <string name="bookmarks_delete">حذف</string>
@@ -68,7 +68,7 @@
     <string name="bookmarks_delete_count">سيتم حذف %1$d كلمات</string>
     <string name="action_cancel">إلغاء</string>
 
-    <string name="settings_title">الإعدادات</string>
+    <string name="settings_title" comment="Title for the settings screen">الإعدادات</string>
     <string name="settings_dark_mode">الوضع الداكن</string>
     <string name="settings_dynamic_color">الألوان الديناميكية</string>
     <string name="settings_offline_mode">وضع عدم الاتصال بالإنترنت</string>
@@ -106,11 +106,16 @@
     <string name="offline_import_failure">فشل تحميل القاموس المحلي.</string>
     <string name="offline_import_invalid_zip">ملف القاموس الذي تم تنزيله غير صالح.</string>
     <string name="offline_download_prompt_title">&#x064A;&#x0644;&#x0632;&#x0645; &#x062A;&#x062D;&#x0645;&#x064A;&#x0644; &#x0627;&#x0644;&#x0642;&#x0627;&#x0645;&#x0648;&#x0633; &#x0627;&#x0644;&#x0645;&#x062D;&#x0644;&#x064A;</string>
-    <string name="offline_download_prompt_message">&#x0644;&#x0627;&#x0633;&#x062A;&#x062E;&#x062F;&#x0627;&#x0645; &#x0627;&#x0644;&#x0628;&#x062D;&#x062B; &#x0628;&#x062F;&#x0648;&#x0646; &#x0625;&#x0646;&#x062A;&#x0631;&#x0646;&#x062A;&#x060C; &#x062D;&#x0645;&#x0651;&#x0644; &#x0627;&#x0644;&#x0642;&#x0627;&#x0645;&#x0648;&#x0633; &#x0627;&#x0644;&#x0645;&#x062D;&#x0644;&#x064A; &#x0623;&#x0648;&#x0644;&#x0627;&#x064B;. &#x0647;&#x0644; &#x062A;&#x0631;&#x064A;&#x062F; &#x0627;&#x0644;&#x0627;&#x0646;&#x062A;&#x0642;&#x0627;&#x0644; &#x0625;&#x0644;&#x0649; &#x0635;&#x0641;&#x062D;&#x0629; &#x0627;&#x0644;&#x0625;&#x0639;&#x062F;&#x0627;&#x062F;&#x0627;&#x062A;&#x061F;</string>
+    <string name="offline_download_prompt_message">&#x0644;&#x0627;&#x0633;&#x062A;&#x062E;&#x062F;&#x0627;&#x0645; &#x0627;&#x0644;&#x0628;&#x062D;&#x062B; &#x0628;&#x062F;&#x0648;&#x0646; &#x0625;&#x0646;&#x062A;&#x0631;&#x0646;&#x062A;&#x060C; &#x062D;&#x0645;&#x0651;&#x0644; &#x0627;&#x0644;&#x0642;&#x0627;&#x0645;&#x0648;&#x0633; &#x0627;&#x0644;&#x0645;&#x062D;&#x0644;&#x064A; &#x0623;&#x0648;&#x0644;&#x0627;&#x064B;. &#x0647;&#x0644; &#x062A;&#x0631;&#x0649;&#x062F; &#x0627;&#x0644;&#x0627;&#x0646;&#x062A;&#x0642;&#x0627;&#x0644; &#x0625;&#x0644;&#x0649; &#x0635;&#x0641;&#x062D;&#x0629; &#x0627;&#x0644;&#x0625;&#x0639;&#x062F;&#x0627;&#x062A;&#x0627;&#x062A;&#x061F;</string>
     <string name="offline_download_prompt_confirm">&#x0646;&#x0639;&#x0645;&#x060C; &#x062D;&#x0648;&#x0651;&#x0644;&#x0646;&#x064A;</string>
     <string name="settings_attribution_title">&#x0645;&#x0635;&#x062F;&#x0631; &#x0627;&#x0644;&#x0628;&#x064A;&#x0627;&#x0646;&#x0627;&#x062A;</string>
     <string name="settings_attribution_description">&#x064A;&#x0639;&#x062A;&#x0645;&#x062F; &#x0627;&#x0644;&#x0628;&#x062D;&#x062B; &#x0648;&#x062A;&#x0641;&#x0627;&#x0635;&#x064A;&#x0644; &#x0627;&#x0644;&#x0643;&#x0644;&#x0645;&#x0627;&#x062A; &#x0639;&#x0644;&#x0649; API &#x0627;&#x0644;&#x0645;&#x0642;&#x062F;&#x0645;&#x0629; &#x0645;&#x0646; Shinjikai.</string>
     <string name="settings_attribution_open">&#x0641;&#x062A;&#x062D; &#x0645;&#x0648;&#x0642;&#x0639; Shinjikai</string>
     <string name="history_clear_all_confirm_title">حذف كل سجل البحث؟</string>
     <string name="history_clear_all_confirm_message">سيتم حذف جميع عمليات البحث المحفوظة.</string>
+    <string name="detail_add_to_anki">&#x0625;&#x0636;&#x0627;&#x0641;&#x0629; &#x0625;&#x0644;&#x0649; Anki</string>
+    <string name="detail_add_to_anki_success">&#x062A;&#x0645;&#x062A; &#x0625;&#x0636;&#x0627;&#x0641;&#x0629; &#x0627;&#x0644;&#x0643;&#x0644;&#x0645;&#x0629; &#x0625;&#x0644;&#x0649; Anki.</string>
+    <string name="detail_add_to_anki_failed">&#x062A;&#x0639;&#x0631;&#x0651;&#x0631;&#x062A; &#x0625;&#x0636;&#x0627;&#x0641;&#x0629; &#x0627;&#x0644;&#x0643;&#x0644;&#x0645;&#x0629; &#x0625;&#x0644;&#x0649; Anki.</string>
+    <string name="detail_add_to_anki_opened_share">&#x062A;&#x0645; &#x0641;&#x062A;&#x062D; Anki &#x0644;&#x0625;&#x0636;&#x0627;&#x0641;&#x0629; &#x0627;&#x0644;&#x0628;&#x0637;&#x0627;&#x0642;&#x0629; &#x064A;&#x062F;&#x0648;&#x064A;&#x0627;&#x064B;.</string>
+    <string name="detail_add_to_anki_not_installed">AnkiDroid &#x063A;&#x064A;&#x0631; &#x0645;&#x062B;&#x0628;&#x062A; &#x0639;&#x0644;&#x0649; &#x0627;&#x0644;&#x062C;&#x0647;&#x0627;&#x0632;.</string>
 </resources>

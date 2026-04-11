@@ -49,11 +49,8 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.shinjikai.dictionary.data.BookmarkItem
 import com.shinjikai.dictionary.ui.BookmarksUiState
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.flow.Flow
 
@@ -72,10 +69,10 @@ fun BookmarksScreenContent(
     val locale = Locale.getDefault()
     val fallbackBookmarkLabel = stringResource(R.string.detail_word_fallback)
     val dateFormatter = remember(locale) {
-        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+        SimpleDateFormat("MMM dd, yyyy", locale)
     }
     val timeFormatter = remember(locale) {
-        DateTimeFormatter.ofPattern("HH:mm", locale)
+        SimpleDateFormat("HH:mm", locale)
     }
     val allIds = uiState.items.map { it.id }.toSet()
 
@@ -83,17 +80,12 @@ fun BookmarksScreenContent(
         viewModel.pruneBookmarkSelection(if (uiState.isEditMode) allIds else emptySet())
     }
 
-    fun localDateOf(epochMs: Long): LocalDate {
-        return Instant.ofEpochMilli(epochMs)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
+    fun localDateOf(epochMs: Long): String {
+        return dateFormatter.format(Date(epochMs))
     }
 
     fun localTimeLabel(epochMs: Long): String {
-        return Instant.ofEpochMilli(epochMs)
-            .atZone(ZoneId.systemDefault())
-            .toLocalTime()
-            .format(timeFormatter)
+        return timeFormatter.format(Date(epochMs))
     }
 
     Scaffold(
@@ -183,7 +175,7 @@ fun BookmarksScreenContent(
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (showHeader) {
                             Text(
-                                text = thisDate.format(dateFormatter),
+                                text = thisDate,
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
                                 modifier = Modifier.padding(start = 6.dp, top = 6.dp)

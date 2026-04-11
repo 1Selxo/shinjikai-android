@@ -3,6 +3,7 @@ package com.shinjikai.dictionary
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.speech.tts.TextToSpeech
@@ -39,6 +40,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.filled.Search
@@ -87,6 +89,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.shinjikai.dictionary.integration.ANKIDROID_PERMISSION
+import com.shinjikai.dictionary.integration.AnkiAddResult
+import com.shinjikai.dictionary.integration.AnkiExporter
+import com.shinjikai.dictionary.integration.AnkiNoteContent
 import com.shinjikai.dictionary.ui.Screen
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
 import java.util.Locale
@@ -584,6 +590,41 @@ private fun DetailScreenContent(
     val context = LocalContext.current
     val detailState = viewModel.detailUiState
     val item = detailState.selectedItem
+    val addToAnkiLabel = stringResource(R.string.detail_add_to_anki)
+    val addToAnkiSuccessMessage = stringResource(R.string.detail_add_to_anki_success)
+    val addToAnkiFailedMessage = stringResource(R.string.detail_add_to_anki_failed)
+    val addToAnkiOpenedShareMessage = stringResource(R.string.detail_add_to_anki_opened_share)
+    val addToAnkiNotInstalledMessage = stringResource(R.string.detail_add_to_anki_not_installed)
+    val ankiNote = remember(useOfflineMode, detailState.selectedItem, detailState.details) {
+        buildDetailAnkiNoteContent(
+            useOfflineMode = useOfflineMode,
+            detailState = detailState
+        )
+    }
+    var pendingAnkiNote by remember { mutableStateOf<AnkiNoteContent?>(null) }
+    val ankiPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val pendingNote = pendingAnkiNote
+        pendingAnkiNote = null
+        if (pendingNote != null) {
+            val result = if (granted) {
+                AnkiExporter.addNote(context, pendingNote)
+            } else {
+                AnkiExporter.shareToAnki(context, pendingNote)
+            }
+            when (result) {
+                AnkiAddResult.Added ->
+                    Toast.makeText(context, addToAnkiSuccessMessage, Toast.LENGTH_SHORT).show()
+                AnkiAddResult.OpenedShareFallback ->
+                    Toast.makeText(context, addToAnkiOpenedShareMessage, Toast.LENGTH_SHORT).show()
+                AnkiAddResult.AnkiNotInstalled ->
+                    Toast.makeText(context, addToAnkiNotInstalledMessage, Toast.LENGTH_SHORT).show()
+                else ->
+                    Toast.makeText(context, addToAnkiFailedMessage, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -602,6 +643,38 @@ private fun DetailScreenContent(
                 },
                 actions = {
                     val isBookmarked = detailState.isBookmarked
+                    FilledTonalIconButton(
+                        onClick = {
+                            val note = ankiNote
+                            if (note == null) {
+                                Toast.makeText(context, addToAnkiFailedMessage, Toast.LENGTH_SHORT).show()
+                            } else {
+                                when (AnkiExporter.addNote(context, note)) {
+                                    AnkiAddResult.Added ->
+                                        Toast.makeText(context, addToAnkiSuccessMessage, Toast.LENGTH_SHORT).show()
+                                    AnkiAddResult.PermissionRequired -> {
+                                        pendingAnkiNote = note
+                                        ankiPermissionLauncher.launch(ANKIDROID_PERMISSION)
+                                    }
+                                    AnkiAddResult.OpenedShareFallback ->
+                                        Toast.makeText(context, addToAnkiOpenedShareMessage, Toast.LENGTH_SHORT).show()
+                                    AnkiAddResult.AnkiNotInstalled ->
+                                        Toast.makeText(context, addToAnkiNotInstalledMessage, Toast.LENGTH_SHORT).show()
+                                    AnkiAddResult.Failed ->
+                                        Toast.makeText(context, addToAnkiFailedMessage, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = addToAnkiLabel
+                        )
+                    }
                     FilledTonalIconButton(
                         onClick = { item?.let(viewModel::toggleBookmark) },
                         colors = IconButtonDefaults.filledTonalIconButtonColors(

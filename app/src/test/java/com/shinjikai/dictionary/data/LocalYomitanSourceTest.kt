@@ -1,0 +1,119 @@
+package com.shinjikai.dictionary.data
+
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class LocalYomitanSourceTest {
+    @Test
+    fun `arabic search normalizes query and ranks strongest matches first`() = runTest {
+        val dao = FakeYomitanDao().apply {
+            glossaryFtsResults = listOf(
+                term(id = 30, expression = "ثالث", glossary = "هذا الايمان راسخ"),
+                term(id = 10, expression = "أول", glossary = "إيمان"),
+                term(id = 20, expression = "ثان", glossary = "ايمان قوي")
+            )
+        }
+
+        val result = LocalYomitanSource(dao).searchWords(term = "إِيمان", page = 0).getOrThrow()
+
+        assertEquals(listOf(10, 20, 30), result.items.map { it.id })
+        assertEquals("glossary:إِيمان*", dao.lastGlossaryFtsQuery)
+        assertEquals(1, result.pageCount)
+        assertEquals(3, result.totalCount)
+    }
+
+    @Test
+    fun `japanese search uses ranked fts results and removes duplicates`() = runTest {
+        val dao = FakeYomitanDao().apply {
+            ftsResults = listOf(
+                term(id = 4, expression = "食パン", reading = "しょくぱん", glossary = "خبز"),
+                term(id = 2, expression = "食べる", reading = "たべる", glossary = "يأكل"),
+                term(id = 3, expression = "食べる", reading = "たべる", glossary = "يأكل"),
+                term(id = 1, expression = "食", reading = "しょく", glossary = "أكل")
+            )
+        }
+
+        val result = LocalYomitanSource(dao).searchWords(term = "食", page = 0).getOrThrow()
+
+        assertEquals(listOf(1, 2, 4), result.items.map { it.id })
+        assertEquals("食*", dao.lastFtsQuery)
+        assertEquals(3, result.totalCount)
+        assertTrue(result.items.none { it.id == 3 })
+    }
+
+    private class FakeYomitanDao : YomitanDao {
+        var ftsResults: List<YomitanTermEntity> = emptyList()
+        var glossaryFtsResults: List<YomitanTermEntity> = emptyList()
+        var directSearchResults: List<YomitanTermEntity> = emptyList()
+        var lastFtsQuery: String? = null
+        var lastGlossaryFtsQuery: String? = null
+
+        override suspend fun search(term: String, prefix: String, limit: Int): List<YomitanTermEntity> = directSearchResults
+
+        override suspend fun searchPaged(term: String, prefix: String, limit: Int, offset: Int): List<YomitanTermEntity> =
+            directSearchResults.drop(offset).take(limit)
+
+        override suspend fun searchFts(matchQuery: String, limit: Int): List<YomitanTermEntity> {
+            lastFtsQuery = matchQuery
+            return ftsResults.take(limit)
+        }
+
+        override suspend fun searchGlossaryFts(matchQuery: String, limit: Int): List<YomitanTermEntity> {
+            lastGlossaryFtsQuery = matchQuery
+            return glossaryFtsResults.take(limit)
+        }
+
+        override suspend fun searchArabic(term: String, normalizedTerm: String, limit: Int): List<YomitanTermEntity> =
+            directSearchResults.take(limit)
+
+        override suspend fun countSearchMatches(term: String): Int = directSearchResults.size
+
+        override suspend fun getById(id: Int): YomitanTermEntity? = null
+
+        override suspend fun loadAllTerms(): List<YomitanTermEntity> = emptyList()
+
+        override suspend fun upsertCategoryRefs(items: List<YomitanTermCategoryEntity>) = Unit
+
+        override suspend fun clearCategoryRefs() = Unit
+
+        override suspend fun countCategoryRefs(): Int = 0
+
+        override suspend fun loadCategoryTermsPaged(categoryId: Int, limit: Int, offset: Int): List<YomitanTermEntity> = emptyList()
+
+        override suspend fun countCategoryTerms(categoryId: Int): Int = 0
+
+        override suspend fun upsertAll(items: List<YomitanTermEntity>) = Unit
+
+        override suspend fun upsertAllFts(items: List<YomitanTermFtsEntity>) = Unit
+
+        override suspend fun clearTerms() = Unit
+
+        override suspend fun clearTermsFts() = Unit
+
+        override suspend fun countTerms(): Int = 0
+
+        override suspend fun loadPreviewTerms(limit: Int): List<YomitanTermEntity> = emptyList()
+
+        override suspend fun upsertMeta(meta: YomitanMetaEntity) = Unit
+
+        override suspend fun getMetaValue(key: String): String? = null
+
+        override suspend fun deleteMeta(key: String) = Unit
+    }
+
+    private companion object {
+        fun term(
+            id: Int,
+            expression: String,
+            reading: String = expression,
+            glossary: String
+        ) = YomitanTermEntity(
+            id = id,
+            expression = expression,
+            reading = reading,
+            glossary = glossary
+        )
+    }
+}

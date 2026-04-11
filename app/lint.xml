@@ -1,0 +1,4 @@
+<lint>
+    <issue id="DirectSystemCurrentTimeMillisUsage" severity="ignore" />
+    <issue id="DirectDateInstantiation" severity="ignore" />
+</lint>

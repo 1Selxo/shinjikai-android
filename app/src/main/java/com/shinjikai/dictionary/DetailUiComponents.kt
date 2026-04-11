@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -524,7 +525,13 @@ private fun DetailWordHeaderCard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(text = kana, style = MaterialTheme.typography.titleLarge)
-                IconButton(onClick = onSpeakKana) {
+                FilledTonalIconButton(
+                    onClick = onSpeakKana,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
                     Icon(imageVector = Icons.Filled.VolumeUp, contentDescription = pronounceLabel)
                 }
             }
@@ -623,6 +630,85 @@ private fun DefinitionsCard(
             }
         }
     }
+}
+
+internal fun buildDetailAnkiNoteContent(
+    useOfflineMode: Boolean,
+    detailState: DetailUiState
+): com.shinjikai.dictionary.integration.AnkiNoteContent? {
+    val item = detailState.selectedItem ?: return null
+    val kanji = detailState.details?.word?.writings?.firstOrNull { it.text.isNotBlank() }?.text
+        .orEmpty()
+        .ifBlank { item.primaryWriting.ifBlank { "-" } }
+    val kana = detailState.details?.word?.kana.orEmpty().ifBlank { item.kana.ifBlank { "-" } }
+    val definitionContent = if (useOfflineMode) {
+        DefinitionContent(
+            text = item.meaningSummary.ifBlank { "-" },
+            references = emptyList()
+        )
+    } else {
+        formatDefinition(
+            meanings = detailState.details?.word?.meanings,
+            notePrefix = "",
+            enableGlossaryLinks = false
+        ).takeIf { it.text.isNotBlank() }
+            ?: DefinitionContent(
+                text = normalizeMeaningText(item.meaningSummary)
+                    .replace("\n", " ")
+                    .replace(Regex("""\s{2,}"""), " ")
+                    .trim()
+                    .ifBlank { "-" },
+                references = emptyList()
+            )
+    }
+
+    return buildAnkiNoteContent(
+        kanji = kanji,
+        kana = kana,
+        meaning = definitionContent.text,
+        examples = detailState.details?.sentenceSearch.orEmpty()
+    )
+}
+
+private fun buildAnkiNoteContent(
+    kanji: String,
+    kana: String,
+    meaning: String,
+    examples: List<SentenceExample>
+): com.shinjikai.dictionary.integration.AnkiNoteContent {
+    val front = buildString {
+        append(kanji.ifBlank { kana })
+        if (kana.isNotBlank() && kana != "-" && kana != kanji) {
+            append("\n")
+            append(kana)
+        }
+    }.trim()
+
+    val cleanedMeaning = meaning.lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && it != "-" }
+        .joinToString("\n")
+
+    val primaryExample = examples.firstOrNull()
+    val back = buildString {
+        append(cleanedMeaning.ifBlank { "-" })
+        if (primaryExample != null) {
+            val exampleText = primaryExample.text.ifBlank { primaryExample.kana }
+            if (exampleText.isNotBlank()) {
+                append("\n\n")
+                append(exampleText)
+            }
+            if (primaryExample.arabic.isNotBlank()) {
+                append("\n")
+                append(primaryExample.arabic)
+            }
+        }
+    }.trim()
+
+    return com.shinjikai.dictionary.integration.AnkiNoteContent(
+        front = front.ifBlank { "-" },
+        back = back.ifBlank { "-" }
+    )
 }
 
 @Composable
