@@ -30,6 +30,15 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="shinjikai" android:host="app" android:pathPrefix="/search" />
+                <data android:scheme="shinjikai" android:host="app" android:pathPrefix="/word" />
+                <data android:scheme="https" android:host="shinjikai.app" android:pathPrefix="/search" />
+                <data android:scheme="https" android:host="shinjikai.app" android:pathPrefix="/word" />
+            </intent-filter>
         </activity>
     </application>
 

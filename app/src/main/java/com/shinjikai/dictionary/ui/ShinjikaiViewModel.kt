@@ -134,8 +134,6 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     var selectedItem by mutableStateOf<SearchItem?>(null)
     private var detailsOpenedFromBookmarks by mutableStateOf(false)
 
-    var currentScreen by mutableStateOf(Screen.Search)
-    val screenStack = mutableStateListOf(Screen.Search)
     private var introDismissedThisSession by mutableStateOf(false)
 
     var activeCategoryId by mutableStateOf<Int?>(null)
@@ -236,46 +234,8 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun navigateTo(screen: Screen) {
-        screenStack.add(screen)
-        currentScreen = screen
-    }
-
-    fun openSearchScreen() {
-        if (currentScreen != Screen.Search) {
-            navigateTo(Screen.Search)
-        }
-    }
-
-    fun openPrimaryScreen(screen: Screen) {
-        screenStack.clear()
-        screenStack.add(screen)
-        currentScreen = screen
-        if (screen != Screen.Detail) {
-            detailsError = null
-        }
-    }
-
     fun focusSearchField() {
         searchFocusNonce += 1
-    }
-
-    fun goBack() {
-        if (screenStack.size > 1) {
-            screenStack.removeAt(screenStack.lastIndex)
-            currentScreen = screenStack.last()
-            if (currentScreen != Screen.Detail) {
-                detailsError = null
-            }
-        }
-    }
-
-    fun goBackOrOpenPrimary(screen: Screen) {
-        if (screenStack.size > 1) {
-            goBack()
-        } else {
-            openPrimaryScreen(screen)
-        }
     }
 
     fun clearCategorySearch() {
@@ -326,16 +286,13 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadMoreResults() = Unit
 
-    private fun openDetailsInternal(item: SearchItem, navigate: Boolean) {
+    private fun openDetailsInternal(item: SearchItem) {
         detailsLoadJob?.cancel()
         detailsOpenedFromBookmarks = false
         selectedItem = item
         details = null
         detailsError = null
         loadingDetails = true
-        if (navigate) {
-            navigateTo(Screen.Detail)
-        }
 
         detailsLoadJob = viewModelScope.launch {
             ensureCategoriesPreloadedIfNeeded()
@@ -347,7 +304,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openDetails(item: SearchItem) {
-        openDetailsInternal(item, navigate = true)
+        openDetailsInternal(item)
     }
 
     fun openBookmarkedDetails(item: SearchItem) {
@@ -357,8 +314,6 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         details = null
         detailsError = null
         loadingDetails = true
-        navigateTo(Screen.Detail)
-
         detailsLoadJob = viewModelScope.launch {
             val cached = withContext(Dispatchers.IO) {
                 bookmarkRepository.getSavedDetails(item.id)
@@ -391,8 +346,13 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         } else {
-            openDetailsInternal(item, navigate = false)
+            openDetailsInternal(item)
         }
+    }
+
+    fun openBookmarkedDetailsById(id: Int) {
+        val bookmarkItem = bookmarkedItems.firstOrNull { it.id == id }?.item ?: SearchItem(id = id)
+        openBookmarkedDetails(bookmarkItem)
     }
 
     fun openDetailsById(id: Int) {
@@ -423,7 +383,6 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         } else {
             val lookupTerm = relatedItem.text.ifBlank { relatedItem.kana }.trim()
             if (lookupTerm.isNotEmpty()) {
-                navigateTo(Screen.Search)
                 term = lookupTerm
                 runSearchForTerm(lookupTerm)
             }
@@ -542,9 +501,6 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissIntroductionAndOpenSettings() {
         dismissIntroduction()
-        screenStack.clear()
-        screenStack.add(Screen.Search)
-        navigateTo(Screen.Settings)
     }
 
     fun showIntroductionAgain() {
@@ -712,14 +668,6 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
 
         require(jsonlFile != null || extractedImagesDir != null || yomitanDirectory != null) {
             "Selected archive does not contain dictionary text, Yomitan term banks, or yomitan_images."
-        }
-
-        val dao = database.yomitanDao()
-        if (extractedImagesDir == null) {
-            dao.deleteMeta(OFFLINE_IMAGE_DIR_META_KEY)
-        }
-        if (jsonlFile == null) {
-            dao.deleteMeta(OFFLINE_CATEGORIES_META_KEY)
         }
 
         var installedImages = false

@@ -47,6 +47,7 @@ import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.shinjikai.dictionary.data.BookmarkItem
+import com.shinjikai.dictionary.data.SearchItem
 import com.shinjikai.dictionary.ui.BookmarksUiState
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
 import java.text.SimpleDateFormat
@@ -60,6 +61,7 @@ fun BookmarksScreenContent(
     viewModel: ShinjikaiViewModel,
     uiState: BookmarksUiState,
     bookmarkFlow: Flow<PagingData<BookmarkItem>>,
+    onOpenBookmarkDetails: (SearchItem) -> Unit,
     onSearchClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onBookmarksClick: () -> Unit,
@@ -185,13 +187,13 @@ fun BookmarksScreenContent(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    if (uiState.isEditMode) {
-                                        viewModel.toggleBookmarkSelection(bookmark.id)
-                                    } else {
-                                        viewModel.openBookmarkedDetails(item)
-                                    }
-                                },
+                                    .clickable {
+                                        if (uiState.isEditMode) {
+                                            viewModel.toggleBookmarkSelection(bookmark.id)
+                                        } else {
+                                            onOpenBookmarkDetails(item)
+                                        }
+                                    },
                             shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {

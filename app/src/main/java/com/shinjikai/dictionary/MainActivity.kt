@@ -10,14 +10,18 @@ import androidx.compose.runtime.setValue
 
 class MainActivity : ComponentActivity() {
     private var processTextQuery by mutableStateOf<String?>(null)
+    private var externalDeepLink by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         processTextQuery = extractProcessTextQuery(intent)
+        externalDeepLink = extractDeepLink(intent)
         setContent {
             ShinjikaiApp(
                 externalSearchTerm = processTextQuery,
-                onExternalSearchTermConsumed = { processTextQuery = null }
+                externalDeepLink = externalDeepLink,
+                onExternalSearchTermConsumed = { processTextQuery = null },
+                onExternalDeepLinkConsumed = { externalDeepLink = null }
             )
         }
     }
@@ -26,6 +30,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         processTextQuery = extractProcessTextQuery(intent)
+        externalDeepLink = extractDeepLink(intent)
     }
 
     private fun extractProcessTextQuery(intent: Intent?): String? {
@@ -34,5 +39,10 @@ class MainActivity : ComponentActivity() {
             ?.toString()
             ?.trim()
             ?.takeIf { it.isNotBlank() }
+    }
+
+    private fun extractDeepLink(intent: Intent?): String? {
+        if (intent?.action != Intent.ACTION_VIEW) return null
+        return intent.dataString?.takeIf { it.isNotBlank() }
     }
 }

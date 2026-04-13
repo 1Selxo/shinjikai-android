@@ -71,7 +71,6 @@ import com.shinjikai.dictionary.data.RelatedWordItem
 import com.shinjikai.dictionary.data.SentenceExample
 import com.shinjikai.dictionary.data.extractPictureReference
 import com.shinjikai.dictionary.ui.DetailUiState
-import com.shinjikai.dictionary.ui.Screen
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
 import java.text.DateFormat
 import java.util.Date
@@ -102,6 +101,7 @@ private val GLOSSARY_REFERENCE_REGEX = Regex("""\{([^:{}]+):(\d+)\}""")
 private val JAPANESE_NUMERIC_REFERENCE_REGEX =
     Regex("""([\p{IsHan}\p{IsHiragana}\p{IsKatakana}ー々ヶ]+)\s*:\s*\d+""")
 private val API_IMAGE_FILENAME_REGEX = Regex("""(?i)^[^/\\?#]+\.(png|jpe?g|webp|gif|bmp|svg)$""")
+private val LOCAL_ABSOLUTE_IMAGE_PATH_REGEX = Regex("""^/(data|storage|sdcard|mnt)/.*""")
 
 @Composable
 fun DetailScreenBody(
@@ -113,7 +113,10 @@ fun DetailScreenBody(
     context: Context,
     clipboardManager: ClipboardManager,
     focusManager: androidx.compose.ui.focus.FocusManager,
-    viewModel: ShinjikaiViewModel
+    viewModel: ShinjikaiViewModel,
+    onOpenCategorySearch: (Int, String) -> Unit,
+    onOpenGlossaryReference: (Int) -> Unit,
+    onOpenRelatedWord: (RelatedWordItem) -> Unit
 ) {
     val item = detailState.selectedItem
     var zoomedPictureUrl by remember { mutableStateOf<String?>(null) }
@@ -213,10 +216,8 @@ fun DetailScreenBody(
                 }
             },
             onCategoryClick = { chip ->
-                viewModel.openSearchScreen()
                 focusManager.clearFocus()
-                viewModel.focusSearchField()
-                viewModel.runCategorySearch(chip.id, chip.label)
+                onOpenCategorySearch(chip.id, chip.label)
             },
             onKanjiClick = {
                 kanji.trim().takeIf { it.isNotEmpty() && it != "-" }?.let {
@@ -240,7 +241,7 @@ fun DetailScreenBody(
                 onGlossaryReferenceClick = { referenceId ->
                     if (!useOfflineMode) {
                         focusManager.clearFocus()
-                        viewModel.openOnlineGlossaryReference(referenceId)
+                        onOpenGlossaryReference(referenceId)
                     }
                 }
             )
@@ -262,7 +263,7 @@ fun DetailScreenBody(
                 expandAllByDefault = true,
                 onWordClick = {
                     focusManager.clearFocus()
-                    viewModel.openDetailsByRelatedItem(it)
+                    onOpenRelatedWord(it)
                 }
             )
         }
@@ -412,6 +413,7 @@ private fun normalizeApiImageUrl(raw: String): String? {
         normalized.startsWith("https://", true) -> normalized
         normalized.startsWith("http://", true) -> "https://${normalized.removePrefix("http://")}"
         normalized.startsWith("//") -> "https:$normalized"
+        LOCAL_ABSOLUTE_IMAGE_PATH_REGEX.matches(normalized) -> "file://$normalized"
         normalized.startsWith("/") -> "https://shinjikai.app$normalized"
         API_IMAGE_FILENAME_REGEX.matches(normalized) -> "https://shinjikai.app/static/word_pictures/$normalized"
         else -> "https://shinjikai.app/$normalized"
@@ -700,7 +702,8 @@ private fun buildAnkiNoteContent(
         expression = kanji.ifBlank { kana }.ifBlank { "-" },
         reading = kana.takeIf { it.isNotBlank() && it != "-" && it != kanji }.orEmpty(),
         meaning = cleanedMeaning.ifBlank { "-" },
-        example = example
+        example = example,
+        speechText = kana.ifBlank { kanji }.ifBlank { "-" }
     )
 }
 

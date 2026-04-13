@@ -7,17 +7,12 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.speech.tts.TextToSpeech
-import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -42,6 +37,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.BookmarkBorder
@@ -89,12 +85,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.navDeepLink
+import androidx.navigation.navArgument
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.shinjikai.dictionary.integration.ANKIDROID_PERMISSION
 import com.shinjikai.dictionary.integration.AnkiAddResult
 import com.shinjikai.dictionary.integration.AnkiExporter
 import com.shinjikai.dictionary.integration.AnkiNoteContent
+import com.shinjikai.dictionary.ui.AppRoute
+import com.shinjikai.dictionary.ui.DetailSource
 import com.shinjikai.dictionary.ui.Screen
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
+import com.shinjikai.dictionary.ui.buildDetailRoute
+import com.shinjikai.dictionary.ui.buildSearchRoute
+import com.shinjikai.dictionary.ui.toScreen
 import java.util.Locale
 import kotlinx.coroutines.launch
 
@@ -102,15 +111,18 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 fun ShinjikaiApp(
     externalSearchTerm: String? = null,
-    onExternalSearchTermConsumed: () -> Unit = {}
+    externalDeepLink: String? = null,
+    onExternalSearchTermConsumed: () -> Unit = {},
+    onExternalDeepLinkConsumed: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val clipboardManager = LocalClipboardManager.current
     val viewModel: ShinjikaiViewModel = viewModel()
     val settings by viewModel.settings.collectAsState()
-    val currentScreen = viewModel.currentScreen
-    val screenStack = viewModel.screenStack
+    val navController = rememberNavController()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentScreen = backStackEntry?.destination?.route.toScreen()
     val appName = stringResource(id = R.string.app_name)
     val supportsDynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val appVersionLabel = remember(context) {
@@ -174,13 +186,16 @@ fun ShinjikaiApp(
     LaunchedEffect(externalSearchTerm) {
         val incoming = externalSearchTerm?.trim().orEmpty()
         if (incoming.isNotBlank()) {
-            screenStack.clear()
-            screenStack.add(Screen.Search)
-            viewModel.currentScreen = Screen.Search
-            viewModel.term = incoming
-            viewModel.runSearchForTerm(incoming)
-            viewModel.focusSearchField()
+            navController.navigateToPrimary(AppRoute.Search, buildSearchRoute(incoming))
             onExternalSearchTermConsumed()
+        }
+    }
+
+    LaunchedEffect(externalDeepLink) {
+        val incoming = externalDeepLink?.trim().orEmpty()
+        if (incoming.isNotBlank()) {
+            navController.navigate(Uri.parse(incoming))
+            onExternalDeepLinkConsumed()
         }
     }
 
@@ -241,49 +256,51 @@ fun ShinjikaiApp(
 
     MaterialTheme(colorScheme = colorScheme, typography = appTypography) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-            BackHandler(enabled = screenStack.size > 1) { viewModel.goBack() }
             val handleSearchTabClick = {
-                if (viewModel.currentScreen == Screen.Search) {
+                if (currentScreen == Screen.Search) {
                     viewModel.focusSearchField()
                 } else {
                     focusManager.clearFocus()
-                    viewModel.openSearchScreen()
+                    navController.navigateToPrimary(AppRoute.Search)
                     viewModel.focusSearchField()
                 }
             }
             Surface(color = MaterialTheme.colorScheme.background) {
-                if (viewModel.settingsUiState.showIntroduction) {
-                    IntroductionScreen(
-                        onFinish = viewModel::dismissIntroduction,
-                        onOpenOfflineSetup = viewModel::dismissIntroductionAndOpenSettings
-                    )
-                } else {
-                    AnimatedContent(
-                        targetState = currentScreen,
-                        transitionSpec = {
-                            when {
-                                initialState == Screen.Search && targetState == Screen.Detail -> {
-                                    (fadeIn(animationSpec = tween(180, delayMillis = 60)) +
-                                        slideInVertically(animationSpec = tween(220)) { it / 18 }) togetherWith
-                                        (fadeOut(animationSpec = tween(140)) +
-                                            slideOutVertically(animationSpec = tween(180)) { it / 10 })
+                Box(modifier = Modifier.fillMaxSize()) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = AppRoute.Search.route,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        composable(
+                            route = "${AppRoute.Search.route}?${AppRoute.SEARCH_QUERY_ARG}={${AppRoute.SEARCH_QUERY_ARG}}",
+                            arguments = listOf(
+                                navArgument(AppRoute.SEARCH_QUERY_ARG) {
+                                    type = NavType.StringType
+                                    nullable = true
+                                    defaultValue = null
                                 }
-                                initialState == Screen.Detail && targetState == Screen.Search -> {
-                                    (fadeIn(animationSpec = tween(180)) +
-                                        slideInVertically(animationSpec = tween(220)) { -it / 18 }) togetherWith
-                                        (fadeOut(animationSpec = tween(140)) +
-                                            slideOutVertically(animationSpec = tween(180)) { -it / 10 })
+                            ),
+                            deepLinks = listOf(
+                                navDeepLink {
+                                    uriPattern = "shinjikai://app/search?${AppRoute.SEARCH_QUERY_ARG}={${AppRoute.SEARCH_QUERY_ARG}}"
+                                },
+                                navDeepLink {
+                                    uriPattern = "https://shinjikai.app/search?${AppRoute.SEARCH_QUERY_ARG}={${AppRoute.SEARCH_QUERY_ARG}}"
                                 }
-                                else -> {
-                                    fadeIn(animationSpec = tween(160)) togetherWith
-                                        fadeOut(animationSpec = tween(120))
+                            ),
+                            enterTransition = { searchEnterTransition() },
+                            exitTransition = { searchExitTransition() },
+                            popEnterTransition = { searchPopEnterTransition() },
+                            popExitTransition = { searchPopExitTransition() }
+                        ) { entry ->
+                            val incomingQuery = entry.arguments?.getString(AppRoute.SEARCH_QUERY_ARG)?.trim().orEmpty()
+                            LaunchedEffect(incomingQuery) {
+                                if (incomingQuery.isNotBlank() && incomingQuery != viewModel.activeResultQuery) {
+                                    viewModel.runSearchForTerm(incomingQuery)
                                 }
                             }
-                        },
-                        label = "screen-transition"
-                    ) { screen ->
-                        when (screen) {
-                            Screen.Search -> SearchScreenContent(
+                            SearchScreenContent(
                                 appName = appName,
                                 useOfflineMode = settings.useOfflineMode,
                                 hasOfflineDictionary = viewModel.settingsUiState.offlineTermCount > 0,
@@ -291,74 +308,119 @@ fun ShinjikaiApp(
                                 viewModel = viewModel,
                                 uiState = viewModel.searchUiState,
                                 searchResults = viewModel.searchResults,
-                                onBackClick = {
+                                onSearchClick = handleSearchTabClick,
+                                onHistoryClick = {
                                     focusManager.clearFocus()
-                                    viewModel.goBackOrOpenPrimary(Screen.Bookmarks)
+                                    navController.navigateToPrimary(AppRoute.History)
+                                },
+                                onBookmarksClick = {
+                                    focusManager.clearFocus()
+                                    navController.navigateToPrimary(AppRoute.Bookmarks)
                                 },
                                 onSettingsClick = {
                                     focusManager.clearFocus()
-                                    viewModel.openPrimaryScreen(Screen.Settings)
+                                    navController.navigateToPrimary(AppRoute.Settings)
                                 },
                                 onOpenDetails = {
                                     focusManager.clearFocus()
-                                    viewModel.openDetails(it)
+                                    navController.navigate(buildDetailRoute(it.id))
                                 }
                             )
-                            Screen.History -> HistoryScreenContent(
+                        }
+                        composable(AppRoute.History.route,
+                            enterTransition = { EnterTransition.None },
+                            exitTransition = { ExitTransition.None },
+                            popEnterTransition = { EnterTransition.None },
+                            popExitTransition = { ExitTransition.None }
+                        ) {
+                            HistoryScreenContent(
                                 uiState = viewModel.searchUiState,
                                 viewModel = viewModel,
                                 onSearchClick = handleSearchTabClick,
+                                onOpenHistoryTerm = { historyTerm ->
+                                    focusManager.clearFocus()
+                                    navController.navigateToPrimary(AppRoute.Search, buildSearchRoute(historyTerm))
+                                },
                                 onHistoryClick = {
                                     focusManager.clearFocus()
-                                    viewModel.openPrimaryScreen(Screen.History)
+                                    navController.navigateToPrimary(AppRoute.History)
                                 },
                                 onBookmarksClick = {
                                     focusManager.clearFocus()
-                                    viewModel.openPrimaryScreen(Screen.Bookmarks)
+                                    navController.navigateToPrimary(AppRoute.Bookmarks)
                                 },
                                 onSettingsClick = {
                                     focusManager.clearFocus()
-                                    viewModel.openPrimaryScreen(Screen.Settings)
+                                    navController.navigateToPrimary(AppRoute.Settings)
                                 }
                             )
-                            Screen.Bookmarks -> BookmarksScreenContent(
+                        }
+                        composable(AppRoute.Bookmarks.route,
+                            enterTransition = { EnterTransition.None },
+                            exitTransition = { ExitTransition.None },
+                            popEnterTransition = { EnterTransition.None },
+                            popExitTransition = { ExitTransition.None }
+                        ) {
+                            BookmarksScreenContent(
                                 viewModel = viewModel,
                                 uiState = viewModel.bookmarksUiState,
                                 bookmarkFlow = viewModel.bookmarkPagingFlow,
+                                onOpenBookmarkDetails = {
+                                    focusManager.clearFocus()
+                                    navController.navigate(
+                                        buildDetailRoute(
+                                            wordId = it.id,
+                                            source = DetailSource.Bookmark
+                                        )
+                                    )
+                                },
                                 onSearchClick = handleSearchTabClick,
                                 onHistoryClick = {
                                     focusManager.clearFocus()
-                                    viewModel.openPrimaryScreen(Screen.History)
+                                    navController.navigateToPrimary(AppRoute.History)
                                 },
                                 onBookmarksClick = {
                                     focusManager.clearFocus()
-                                    viewModel.openPrimaryScreen(Screen.Bookmarks)
+                                    navController.navigateToPrimary(AppRoute.Bookmarks)
                                 },
                                 onSettingsClick = {
                                     focusManager.clearFocus()
-                                    viewModel.openPrimaryScreen(Screen.Settings)
+                                    navController.navigateToPrimary(AppRoute.Settings)
                                 }
                             )
-                            Screen.Settings -> SettingsScreenContent(
+                        }
+                        composable(AppRoute.Settings.route,
+                            enterTransition = { EnterTransition.None },
+                            exitTransition = { ExitTransition.None },
+                            popEnterTransition = { EnterTransition.None },
+                            popExitTransition = { ExitTransition.None }
+                        ) {
+                            SettingsScreenContent(
                                 appVersionLabel = appVersionLabel,
                                 supportsDynamicColor = supportsDynamicColor,
                                 uiState = viewModel.settingsUiState,
                                 viewModel = viewModel,
+                                onOpenLocalDictionary = {
+                                    focusManager.clearFocus()
+                                    navController.navigate(AppRoute.LocalDictionary.route)
+                                },
                                 onSearchClick = handleSearchTabClick,
                                 onHistoryClick = {
                                     focusManager.clearFocus()
-                                    viewModel.openPrimaryScreen(Screen.History)
+                                    navController.navigateToPrimary(AppRoute.History)
                                 },
                                 onBookmarksClick = {
                                     focusManager.clearFocus()
-                                    viewModel.openPrimaryScreen(Screen.Bookmarks)
+                                    navController.navigateToPrimary(AppRoute.Bookmarks)
                                 },
                                 onSettingsClick = {
                                     focusManager.clearFocus()
-                                    viewModel.openPrimaryScreen(Screen.Settings)
+                                    navController.navigateToPrimary(AppRoute.Settings)
                                 }
                             )
-                            Screen.LocalDictionary -> LocalDictionaryScreenContent(
+                        }
+                        composable(AppRoute.LocalDictionary.route) {
+                            LocalDictionaryScreenContent(
                                 uiState = viewModel.settingsUiState,
                                 onPickOfflineZip = {
                                     pickOfflineZipLauncher.launch(
@@ -371,17 +433,85 @@ fun ShinjikaiApp(
                                         )
                                     )
                                 },
-                                onGoBack = viewModel::goBack
+                                onGoBack = { navController.popBackStack() }
                             )
-                            Screen.Detail -> DetailScreenContent(
+                        }
+                        composable(
+                            route = "${AppRoute.Detail.route}/{${AppRoute.DETAIL_WORD_ID_ARG}}?${AppRoute.DETAIL_SOURCE_ARG}={${AppRoute.DETAIL_SOURCE_ARG}}",
+                            arguments = listOf(
+                                navArgument(AppRoute.DETAIL_WORD_ID_ARG) {
+                                    type = NavType.IntType
+                                },
+                                navArgument(AppRoute.DETAIL_SOURCE_ARG) {
+                                    type = NavType.StringType
+                                    defaultValue = DetailSource.Online.value
+                                }
+                            ),
+                            deepLinks = listOf(
+                                navDeepLink {
+                                    uriPattern = "shinjikai://app/word/{${AppRoute.DETAIL_WORD_ID_ARG}}"
+                                },
+                                navDeepLink {
+                                    uriPattern = "https://shinjikai.app/word/{${AppRoute.DETAIL_WORD_ID_ARG}}"
+                                }
+                            ),
+                            enterTransition = { detailEnterTransition() },
+                            exitTransition = { detailExitTransition() },
+                            popEnterTransition = { detailPopEnterTransition() },
+                            popExitTransition = { detailPopExitTransition() }
+                        ) { entry ->
+                            val wordId = entry.arguments?.getInt(AppRoute.DETAIL_WORD_ID_ARG) ?: 0
+                            val source = entry.arguments?.getString(AppRoute.DETAIL_SOURCE_ARG)
+                                ?.let { value -> DetailSource.entries.firstOrNull { it.value == value } }
+                                ?: DetailSource.Online
+                            LaunchedEffect(wordId, source) {
+                                if (wordId > 0) {
+                                    when (source) {
+                                        DetailSource.Bookmark -> viewModel.openBookmarkedDetailsById(wordId)
+                                        DetailSource.Online -> viewModel.openDetailsById(wordId)
+                                    }
+                                }
+                            }
+                            DetailScreenContent(
                                 useOfflineMode = settings.useOfflineMode,
                                 canSpeakJapanese = canSpeakJapanese,
                                 textToSpeech = textToSpeech,
                                 clipboardManager = clipboardManager,
                                 focusManager = focusManager,
-                                viewModel = viewModel
+                                viewModel = viewModel,
+                                onGoBack = { navController.popBackStack() },
+                                onOpenCategorySearch = { categoryId, categoryName ->
+                                    navController.navigateToPrimary(AppRoute.Search)
+                                    viewModel.runCategorySearch(categoryId, categoryName)
+                                },
+                                onOpenGlossaryReference = { referenceId ->
+                                    navController.navigate(buildDetailRoute(referenceId))
+                                },
+                                onOpenRelatedWord = { relatedItem ->
+                                    if (relatedItem.wordId > 0) {
+                                        navController.navigate(buildDetailRoute(relatedItem.wordId))
+                                    } else {
+                                        val lookupTerm = relatedItem.text.ifBlank { relatedItem.kana }.trim()
+                                        if (lookupTerm.isNotBlank()) {
+                                            navController.navigateToPrimary(
+                                                AppRoute.Search,
+                                                buildSearchRoute(lookupTerm)
+                                            )
+                                        }
+                                    }
+                                }
                             )
                         }
+                    }
+
+                    if (viewModel.settingsUiState.showIntroduction) {
+                        IntroductionScreen(
+                            onFinish = viewModel::dismissIntroduction,
+                            onOpenOfflineSetup = {
+                                viewModel.dismissIntroduction()
+                                navController.navigateToPrimary(AppRoute.Settings)
+                            }
+                        )
                     }
                 }
 
@@ -582,7 +712,11 @@ private fun DetailScreenContent(
     textToSpeech: TextToSpeech?,
     clipboardManager: androidx.compose.ui.platform.ClipboardManager,
     focusManager: androidx.compose.ui.focus.FocusManager,
-    viewModel: ShinjikaiViewModel
+    viewModel: ShinjikaiViewModel,
+    onGoBack: () -> Unit,
+    onOpenCategorySearch: (Int, String) -> Unit,
+    onOpenGlossaryReference: (Int) -> Unit,
+    onOpenRelatedWord: (com.shinjikai.dictionary.data.RelatedWordItem) -> Unit
 ) {
     val context = LocalContext.current
     val detailState = viewModel.detailUiState
@@ -592,6 +726,7 @@ private fun DetailScreenContent(
     val addToAnkiFailedMessage = stringResource(R.string.detail_add_to_anki_failed)
     val addToAnkiOpenedShareMessage = stringResource(R.string.detail_add_to_anki_opened_share)
     val addToAnkiNotInstalledMessage = stringResource(R.string.detail_add_to_anki_not_installed)
+    val coroutineScope = rememberCoroutineScope()
     val ankiNote = remember(useOfflineMode, detailState.selectedItem, detailState.details) {
         buildDetailAnkiNoteContent(
             useOfflineMode = useOfflineMode,
@@ -599,26 +734,52 @@ private fun DetailScreenContent(
         )
     }
     var pendingAnkiNote by remember { mutableStateOf<AnkiNoteContent?>(null) }
+    var ankiAddedItemId by remember { mutableStateOf<Int?>(null) }
+    var isAddingToAnki by remember { mutableStateOf(false) }
+    LaunchedEffect(item?.id) {
+        if (item?.id != ankiAddedItemId) {
+            ankiAddedItemId = null
+        }
+        isAddingToAnki = false
+    }
+    fun handleAnkiResult(result: AnkiAddResult, selectedItemId: Int?) {
+        when (result) {
+            AnkiAddResult.Added -> {
+                ankiAddedItemId = selectedItemId
+                Toast.makeText(context, addToAnkiSuccessMessage, Toast.LENGTH_SHORT).show()
+            }
+            AnkiAddResult.OpenedShareFallback ->
+                Toast.makeText(context, addToAnkiOpenedShareMessage, Toast.LENGTH_SHORT).show()
+            AnkiAddResult.AnkiNotInstalled ->
+                Toast.makeText(context, addToAnkiNotInstalledMessage, Toast.LENGTH_SHORT).show()
+            else ->
+                Toast.makeText(context, addToAnkiFailedMessage, Toast.LENGTH_SHORT).show()
+        }
+    }
+    fun launchAnkiExport(note: AnkiNoteContent, selectedItemId: Int?) {
+        coroutineScope.launch {
+            isAddingToAnki = true
+            val result = AnkiExporter.addNote(
+                context = context,
+                note = note,
+                textToSpeech = textToSpeech,
+                canSpeakJapanese = canSpeakJapanese
+            )
+            isAddingToAnki = false
+            handleAnkiResult(result, selectedItemId)
+        }
+    }
     val ankiPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         val pendingNote = pendingAnkiNote
         pendingAnkiNote = null
         if (pendingNote != null) {
-            val result = if (granted) {
-                AnkiExporter.addNote(context, pendingNote)
+            if (granted) {
+                launchAnkiExport(pendingNote, item?.id)
             } else {
                 AnkiExporter.shareToAnki(context, pendingNote)
-            }
-            when (result) {
-                AnkiAddResult.Added ->
-                    Toast.makeText(context, addToAnkiSuccessMessage, Toast.LENGTH_SHORT).show()
-                AnkiAddResult.OpenedShareFallback ->
-                    Toast.makeText(context, addToAnkiOpenedShareMessage, Toast.LENGTH_SHORT).show()
-                AnkiAddResult.AnkiNotInstalled ->
-                    Toast.makeText(context, addToAnkiNotInstalledMessage, Toast.LENGTH_SHORT).show()
-                else ->
-                    Toast.makeText(context, addToAnkiFailedMessage, Toast.LENGTH_SHORT).show()
+                        .also { handleAnkiResult(it, item?.id) }
             }
         }
     }
@@ -629,7 +790,7 @@ private fun DetailScreenContent(
                 title = { Text(stringResource(R.string.detail_title)) },
                 navigationIcon = {
                     FilledTonalIconButton(
-                        onClick = viewModel::goBack,
+                        onClick = onGoBack,
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -640,35 +801,41 @@ private fun DetailScreenContent(
                 },
                 actions = {
                     val isBookmarked = detailState.isBookmarked
+                    val isAddedToAnki = item?.id != null && item.id == ankiAddedItemId
                     FilledTonalIconButton(
                         onClick = {
                             val note = ankiNote
                             if (note == null) {
                                 Toast.makeText(context, addToAnkiFailedMessage, Toast.LENGTH_SHORT).show()
                             } else {
-                                when (AnkiExporter.addNote(context, note)) {
-                                    AnkiAddResult.Added ->
-                                        Toast.makeText(context, addToAnkiSuccessMessage, Toast.LENGTH_SHORT).show()
-                                    AnkiAddResult.PermissionRequired -> {
+                                when {
+                                    AnkiExporter.canRequestDirectAdd(context) &&
+                                        !AnkiExporter.hasDatabasePermission(context) -> {
                                         pendingAnkiNote = note
                                         ankiPermissionLauncher.launch(ANKIDROID_PERMISSION)
                                     }
-                                    AnkiAddResult.OpenedShareFallback ->
-                                        Toast.makeText(context, addToAnkiOpenedShareMessage, Toast.LENGTH_SHORT).show()
-                                    AnkiAddResult.AnkiNotInstalled ->
-                                        Toast.makeText(context, addToAnkiNotInstalledMessage, Toast.LENGTH_SHORT).show()
-                                    AnkiAddResult.Failed ->
-                                        Toast.makeText(context, addToAnkiFailedMessage, Toast.LENGTH_SHORT).show()
+                                    else -> {
+                                        launchAnkiExport(note, item?.id)
+                                    }
                                 }
                             }
                         },
+                        enabled = !isAddingToAnki,
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            containerColor = if (isAddedToAnki) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            },
+                            contentColor = if (isAddedToAnki) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
                         )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Add,
+                            imageVector = if (isAddedToAnki) Icons.Default.Check else Icons.Default.Add,
                             contentDescription = addToAnkiLabel
                         )
                     }
@@ -709,7 +876,59 @@ private fun DetailScreenContent(
             context = context,
             clipboardManager = clipboardManager,
             focusManager = focusManager,
-            viewModel = viewModel
+            viewModel = viewModel,
+            onOpenCategorySearch = onOpenCategorySearch,
+            onOpenGlossaryReference = onOpenGlossaryReference,
+            onOpenRelatedWord = onOpenRelatedWord
         )
     }
 }
+
+private fun NavHostController.navigateToPrimary(route: AppRoute, targetRoute: String = route.route) {
+    val startDestinationId = graph.startDestinationId
+    navigate(targetRoute) {
+        if (startDestinationId != 0) {
+            popUpTo(startDestinationId) {
+                saveState = true
+            }
+        }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
+private fun AnimatedContentTransitionScope<*>.searchEnterTransition() =
+    fadeIn(animationSpec = tween(180))
+
+private fun AnimatedContentTransitionScope<*>.searchExitTransition() =
+    fadeOut(animationSpec = tween(120))
+
+private fun AnimatedContentTransitionScope<*>.searchPopEnterTransition() =
+    fadeIn(animationSpec = tween(180))
+
+private fun AnimatedContentTransitionScope<*>.searchPopExitTransition() =
+    fadeOut(animationSpec = tween(120))
+
+private fun AnimatedContentTransitionScope<*>.detailEnterTransition() =
+    slideIntoContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.Start,
+        animationSpec = tween(220)
+    ) + fadeIn(animationSpec = tween(180))
+
+private fun AnimatedContentTransitionScope<*>.detailExitTransition() =
+    slideOutOfContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.Start,
+        animationSpec = tween(180)
+    ) + fadeOut(animationSpec = tween(140))
+
+private fun AnimatedContentTransitionScope<*>.detailPopEnterTransition() =
+    slideIntoContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.End,
+        animationSpec = tween(220)
+    ) + fadeIn(animationSpec = tween(180))
+
+private fun AnimatedContentTransitionScope<*>.detailPopExitTransition() =
+    slideOutOfContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.End,
+        animationSpec = tween(180)
+    ) + fadeOut(animationSpec = tween(140))

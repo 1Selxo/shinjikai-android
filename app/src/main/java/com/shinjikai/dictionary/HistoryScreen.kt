@@ -51,6 +51,7 @@ fun HistoryScreenContent(
     uiState: SearchUiState,
     viewModel: ShinjikaiViewModel,
     onSearchClick: () -> Unit,
+    onOpenHistoryTerm: (String) -> Unit,
     onHistoryClick: () -> Unit,
     onBookmarksClick: () -> Unit,
     onSettingsClick: () -> Unit
@@ -147,10 +148,7 @@ fun HistoryScreenContent(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        viewModel.term = historyTerm
-                                        viewModel.openSearchScreen()
-                                        viewModel.focusSearchField()
-                                        viewModel.runSearch()
+                                        onOpenHistoryTerm(historyTerm)
                                     }
                                     .padding(horizontal = 14.dp, vertical = 12.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),

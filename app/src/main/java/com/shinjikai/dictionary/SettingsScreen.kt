@@ -74,6 +74,7 @@ fun SettingsScreenContent(
     supportsDynamicColor: Boolean,
     uiState: SettingsUiState,
     viewModel: ShinjikaiViewModel,
+    onOpenLocalDictionary: () -> Unit,
     onSearchClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onBookmarksClick: () -> Unit,
@@ -125,7 +126,7 @@ fun SettingsScreenContent(
 
             LocalDictionarySummaryCard(
                 uiState = uiState,
-                onClick = { viewModel.navigateTo(Screen.LocalDictionary) }
+                onClick = onOpenLocalDictionary
             )
 
             Card(

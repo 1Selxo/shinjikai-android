@@ -6,20 +6,31 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Bundle
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import androidx.core.content.ContextCompat
 import com.ichi2.anki.api.AddContentApi
+import java.io.File
+import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 
 private const val ANKIDROID_PACKAGE = "com.ichi2.anki"
 const val ANKIDROID_PERMISSION = "com.ichi2.anki.permission.READ_WRITE_DATABASE"
 private const val SHINJIKAI_DECK_NAME = "Shinjikai"
-private const val SHINJIKAI_MODEL_NAME = "com.shinjikai.dictionary.dark.v3"
-private val SHINJIKAI_MODEL_FIELDS = arrayOf("Expression", "Reading", "Meaning", "Example")
+private const val SHINJIKAI_MODEL_NAME = "com.shinjikai.dictionary.dark.v5"
+private val SHINJIKAI_MODEL_FIELDS = arrayOf("Expression", "Reading", "Meaning", "Example", "Audio")
 private val SHINJIKAI_CARD_NAMES = arrayOf("Meaning")
 private val SHINJIKAI_QUESTION_TEMPLATES = arrayOf(
     """
     <div class="screen">
       <div class="card-shell">
         <div class="expression">{{Expression}}</div>
+        {{#Audio}}<div class="audio">{{Audio}}</div>{{/Audio}}
       </div>
     </div>
     """.trimIndent()
@@ -30,6 +41,7 @@ private val SHINJIKAI_ANSWER_TEMPLATES = arrayOf(
       <div class="card-shell">
         {{#Reading}}<div class="reading">{{Reading}}</div>{{/Reading}}
         <div class="expression">{{Expression}}</div>
+        {{#Audio}}<div class="audio">{{Audio}}</div>{{/Audio}}
       </div>
     </div>
     <div class="answer-divider"></div>
@@ -46,18 +58,16 @@ private val SHINJIKAI_ANSWER_TEMPLATES = arrayOf(
     """.trimIndent()
 )
 private const val SHINJIKAI_CARD_CSS = """
-    html, body {
+    html, body, #qa, #answer, .card, .night_mode, .nightMode {
       margin: 0;
       padding: 0;
-      background: #0e1116;
+      background: #05070b !important;
+      color: #e8eaed !important;
     }
     .card {
-      margin: 0;
       padding: 24px 16px;
-      background: #0e1116;
       min-height: 100vh;
       box-sizing: border-box;
-      color: #e8eaed;
       font-family: "Noto Sans Arabic", "Noto Sans JP", sans-serif;
     }
     .screen {
@@ -84,6 +94,25 @@ private const val SHINJIKAI_CARD_CSS = """
       color: #8ab4f8;
       margin-bottom: 14px;
       letter-spacing: 0.03em;
+    }
+    .audio {
+      margin-top: 16px;
+    }
+    .replaybutton {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 52px;
+      height: 52px;
+      border-radius: 999px;
+      background: #2a5ea8;
+      text-decoration: none;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+    }
+    .replaybutton svg {
+      width: 24px;
+      height: 24px;
+      fill: #ffffff;
     }
     .section-label {
       font-size: 13px;
@@ -126,9 +155,10 @@ data class AnkiNoteContent(
     val expression: String,
     val reading: String,
     val meaning: String,
-    val example: String
+    val example: String,
+    val speechText: String
 ) {
-    fun fields(): Array<String> = arrayOf(expression, reading, meaning, example)
+    fun fields(audio: String = ""): Array<String> = arrayOf(expression, reading, meaning, example, audio)
 
     val shareSubject: String
         get() = expression
@@ -164,10 +194,25 @@ object AnkiExporter {
     fun hasDatabasePermission(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, ANKIDROID_PERMISSION) == PackageManager.PERMISSION_GRANTED
 
-    fun addNote(context: Context, note: AnkiNoteContent): AnkiAddResult {
+    suspend fun addNote(
+        context: Context,
+        note: AnkiNoteContent,
+        textToSpeech: TextToSpeech? = null,
+        canSpeakJapanese: Boolean = false
+    ): AnkiAddResult {
         if (!isAnkiDroidInstalled(context)) return AnkiAddResult.AnkiNotInstalled
         if (!canRequestDirectAdd(context)) return shareToAnki(context, note)
         if (!hasDatabasePermission(context)) return AnkiAddResult.PermissionRequired
+
+        val audioField = if (canSpeakJapanese && textToSpeech != null && note.speechText.isNotBlank()) {
+            synthesizeAudioField(
+                context = context,
+                note = note,
+                textToSpeech = textToSpeech
+            )
+        } else {
+            ""
+        }
 
         return runCatching {
             val api = AddContentApi(context)
@@ -188,7 +233,7 @@ object AnkiExporter {
             if (deckId <= 0L || modelId <= 0L) {
                 shareToAnki(context, note)
             } else {
-                val noteId = api.addNote(modelId, deckId, note.fields(), null)
+                val noteId = api.addNote(modelId, deckId, note.fields(audioField), null)
                 if (noteId > 0L) AnkiAddResult.Added else shareToAnki(context, note)
             }
         }.getOrElse {
@@ -197,6 +242,75 @@ object AnkiExporter {
             } else {
                 shareToAnki(context, note)
             }
+        }
+    }
+
+    private suspend fun synthesizeAudioField(
+        context: Context,
+        note: AnkiNoteContent,
+        textToSpeech: TextToSpeech
+    ): String = withContext(Dispatchers.IO) {
+        val tempFile = File(context.cacheDir, "anki-audio-${UUID.randomUUID()}.wav")
+        val importedName = try {
+            val synthResult = synthesizeToFile(
+                textToSpeech = textToSpeech,
+                text = note.speechText,
+                destination = tempFile,
+                utteranceId = "anki-audio-${UUID.randomUUID()}"
+            )
+            if (!synthResult || !tempFile.exists() || tempFile.length() == 0L) {
+                ""
+            } else {
+                val api = AddContentApi(context)
+                api.addMediaFromUri(
+                    Uri.fromFile(tempFile),
+                    tempFile.name,
+                    "audio/wav"
+                ).orEmpty()
+            }
+        } finally {
+            tempFile.delete()
+        }
+
+        if (importedName.isBlank()) "" else "[sound:$importedName]"
+    }
+
+    private suspend fun synthesizeToFile(
+        textToSpeech: TextToSpeech,
+        text: String,
+        destination: File,
+        utteranceId: String
+    ): Boolean = suspendCancellableCoroutine { continuation ->
+        val listener = object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) = Unit
+
+            override fun onDone(completedUtteranceId: String?) {
+                if (completedUtteranceId == utteranceId && continuation.isActive) {
+                    continuation.resume(true)
+                }
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun onError(errorUtteranceId: String?) {
+                if (errorUtteranceId == utteranceId && continuation.isActive) {
+                    continuation.resume(false)
+                }
+            }
+
+            override fun onError(errorUtteranceId: String?, errorCode: Int) {
+                if (errorUtteranceId == utteranceId && continuation.isActive) {
+                    continuation.resume(false)
+                }
+            }
+        }
+
+        textToSpeech.setOnUtteranceProgressListener(listener)
+        val params = Bundle().apply {
+            putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
+        }
+        val result = textToSpeech.synthesizeToFile(text, params, destination, utteranceId)
+        if (result != TextToSpeech.SUCCESS && continuation.isActive) {
+            continuation.resume(false)
         }
     }
 

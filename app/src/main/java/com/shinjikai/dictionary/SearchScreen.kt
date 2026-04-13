@@ -8,18 +8,18 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -28,10 +28,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -39,7 +37,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,10 +47,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -67,6 +64,7 @@ import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.shinjikai.dictionary.data.SearchItem
 import com.shinjikai.dictionary.ui.ResultMode
+import com.shinjikai.dictionary.ui.Screen
 import com.shinjikai.dictionary.ui.SearchUiState
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
 import kotlinx.coroutines.flow.Flow
@@ -81,7 +79,9 @@ fun SearchScreenContent(
     viewModel: ShinjikaiViewModel,
     uiState: SearchUiState,
     searchResults: Flow<PagingData<SearchItem>>,
-    onBackClick: () -> Unit,
+    onSearchClick: () -> Unit,
+    onHistoryClick: () -> Unit,
+    onBookmarksClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onOpenDetails: (SearchItem) -> Unit
 ) {
@@ -97,7 +97,8 @@ fun SearchScreenContent(
     val isRefreshing = hasActiveSearch && refreshState is LoadState.Loading
     val refreshError = (refreshState as? LoadState.Error)?.error?.message?.takeIf { hasActiveSearch }
     val showLanding = !hasActiveSearch && uiState.term.isBlank() && !isRefreshing && refreshError == null
-    val showNoResults = hasActiveSearch && uiState.term.isNotBlank() && lazyResults.itemCount == 0 && !isRefreshing && refreshError == null
+    val showNoResults =
+        hasActiveSearch && uiState.term.isNotBlank() && lazyResults.itemCount == 0 && !isRefreshing && refreshError == null
     val landingSuggestions = remember {
         listOf(
             "猫",
@@ -128,43 +129,36 @@ fun SearchScreenContent(
 
     Scaffold(
         containerColor = Color.Transparent,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.nav_search)) },
-                navigationIcon = {
-                    FilledTonalIconButton(
-                        onClick = onBackClick,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.nav_back)
-                        )
-                    }
-                }
-            )
-        },
         bottomBar = {
-            SearchBottomDock(
+            PrimaryBottomBar(
+                currentScreen = Screen.Search,
+                onSearchClick = onSearchClick,
+                onHistoryClick = onHistoryClick,
+                onBookmarksClick = onBookmarksClick,
+                onSettingsClick = onSettingsClick,
+                modifier = Modifier.navigationBarsPadding()
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SearchTopDock(
                 term = uiState.term,
                 useOfflineMode = useOfflineMode,
                 activeCategoryName = uiState.activeCategoryName,
+                searchFocusNonce = searchFocusNonce,
                 onTermChange = { viewModel.term = it },
                 onRunSearch = {
                     focusManager.clearFocus()
                     viewModel.runSearch()
                 },
-                onClearTerm = {
-                    viewModel.runSearchForTerm("")
-                    searchFocusRequester.requestFocus()
-                },
-                onClearCategory = {
-                    viewModel.clearCategorySearch()
-                    searchFocusRequester.requestFocus()
-                },
+                onClearTerm = { viewModel.runSearchForTerm("") },
+                onClearCategory = { viewModel.clearCategorySearch() },
                 onModeSelected = { selectedOffline ->
                     if (selectedOffline && !hasOfflineDictionary) {
                         showOfflineDownloadPrompt = true
@@ -174,17 +168,9 @@ fun SearchScreenContent(
                 },
                 focusRequester = searchFocusRequester,
                 onFieldReady = { isSearchFieldReady = true },
-                onFocusChanged = { }
+                modifier = Modifier.fillMaxWidth()
             )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+
             if (isRefreshing) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -201,22 +187,24 @@ fun SearchScreenContent(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(18.dp)
                     ) {
-                        LandingSuggestions(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(if (useOfflineMode && uiState.offlinePreviewItems.isNotEmpty()) 0.58f else 1f),
-                            appName = appName,
-                            suggestions = landingSuggestions,
-                            onSuggestionClick = { suggestion ->
-                                viewModel.term = suggestion
-                                focusManager.clearFocus()
-                                viewModel.runSearchForTerm(suggestion)
-                            }
-                        )
+                        if (!useOfflineMode) {
+                            LandingSuggestions(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                appName = appName,
+                                suggestions = landingSuggestions,
+                                onSuggestionClick = { suggestion ->
+                                    viewModel.term = suggestion
+                                    focusManager.clearFocus()
+                                    viewModel.runSearchForTerm(suggestion)
+                                }
+                            )
+                        }
 
                         if (useOfflineMode && uiState.offlinePreviewItems.isNotEmpty()) {
                             LazyColumn(
-                                modifier = Modifier.weight(0.42f),
+                                modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(vertical = 4.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
@@ -229,6 +217,20 @@ fun SearchScreenContent(
                                         onClick = { onOpenDetails(item) }
                                     )
                                 }
+                            }
+                        } else if (useOfflineMode) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = appName,
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center
+                                )
                             }
                         }
                     }
@@ -253,7 +255,7 @@ fun SearchScreenContent(
                                 modifier = Modifier.fillMaxWidth(),
                                 appName = appName,
                                 suggestions = landingSuggestions,
-                                title = "جرّب كلمات أخرى",
+                                title = stringResource(R.string.search_try_other_words),
                                 onSuggestionClick = { suggestion ->
                                     viewModel.term = suggestion
                                     focusManager.clearFocus()
@@ -380,11 +382,12 @@ fun SearchScreenContent(
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun SearchBottomDock(
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+private fun SearchTopDock(
     term: String,
     useOfflineMode: Boolean,
     activeCategoryName: String?,
+    searchFocusNonce: Int,
     onTermChange: (String) -> Unit,
     onRunSearch: () -> Unit,
     onClearTerm: () -> Unit,
@@ -392,14 +395,20 @@ private fun SearchBottomDock(
     onModeSelected: (Boolean) -> Unit,
     focusRequester: FocusRequester,
     onFieldReady: () -> Unit,
-    onFocusChanged: (androidx.compose.ui.focus.FocusState) -> Unit
+    modifier: Modifier = Modifier
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val isImeVisible = WindowInsets.isImeVisible
+
+    LaunchedEffect(searchFocusNonce) {
+        if (searchFocusNonce > 0) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .imePadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = modifier.padding(vertical = if (isImeVisible) 6.dp else 4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         activeCategoryName?.let {
@@ -434,8 +443,7 @@ private fun SearchBottomDock(
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester)
-                    .onGloballyPositioned { onFieldReady() }
-                    .onFocusChanged(onFocusChanged),
+                    .onGloballyPositioned { onFieldReady() },
                 singleLine = true,
                 placeholder = { Text(stringResource(R.string.search_hint)) },
                 shape = RoundedCornerShape(28.dp),
@@ -474,7 +482,7 @@ private fun LandingSuggestions(
     modifier: Modifier = Modifier,
     appName: String,
     suggestions: List<String>,
-    title: String = "جرّب كلمات يابانية مثل",
+    title: String = stringResource(R.string.search_try_japanese_words),
     onSuggestionClick: (String) -> Unit
 ) {
     Box(

@@ -32,7 +32,6 @@ import com.shinjikai.dictionary.ui.Screen
 @Composable
 fun PrimaryBottomBar(
     currentScreen: Screen,
-    isSearchFocused: Boolean = false,
     onSearchClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onBookmarksClick: () -> Unit,
@@ -40,99 +39,83 @@ fun PrimaryBottomBar(
     modifier: Modifier = Modifier
 ) {
     val barColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f)
-    val searchButtonColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.98f)
     val activePillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
     val activeContentColor = MaterialTheme.colorScheme.primary
     val inactiveColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.70f)
-    val isSearchSelected = currentScreen == Screen.Search || isSearchFocused
 
-    Row(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 32.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 24.dp, vertical = 6.dp)
+            .height(72.dp),
+        shape = RoundedCornerShape(30.dp),
+        color = barColor,
+        tonalElevation = 3.dp,
+        shadowElevation = 9.dp
     ) {
-        Surface(
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .height(72.dp),
-            shape = RoundedCornerShape(30.dp),
-            color = barColor,
-            tonalElevation = 3.dp,
-            shadowElevation = 9.dp
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                NavPillItem(
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.History,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    },
-                    selected = currentScreen == Screen.History,
-                    selectedContainerColor = activePillColor,
-                    selectedContentColor = activeContentColor,
-                    unselectedContentColor = inactiveColor,
-                    onClick = onHistoryClick
-                )
-                NavPillItem(
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.Bookmark,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    },
-                    selected = currentScreen == Screen.Bookmarks,
-                    selectedContainerColor = activePillColor,
-                    selectedContentColor = activeContentColor,
-                    unselectedContentColor = inactiveColor,
-                    onClick = onBookmarksClick
-                )
-                NavPillItem(
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    },
-                    selected = currentScreen == Screen.Settings,
-                    selectedContainerColor = activePillColor,
-                    selectedContentColor = activeContentColor,
-                    unselectedContentColor = inactiveColor,
-                    onClick = onSettingsClick
-                )
-            }
-        }
-
-        Surface(
-            onClick = onSearchClick,
-            modifier = Modifier.size(72.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = if (isSearchSelected) searchButtonColor else barColor,
-            tonalElevation = 3.dp,
-            shadowElevation = 9.dp
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                CompositionLocalProvider(
-                    LocalContentColor provides if (isSearchSelected) activeContentColor else inactiveColor
-                ) {
+            NavPillItem(
+                icon = {
                     Icon(
                         imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        modifier = Modifier.size(30.dp)
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
                     )
-                }
-            }
+                },
+                selected = currentScreen == Screen.Search,
+                selectedContainerColor = activePillColor,
+                selectedContentColor = activeContentColor,
+                unselectedContentColor = inactiveColor,
+                onClick = onSearchClick
+            )
+            NavPillItem(
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.History,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                },
+                selected = currentScreen == Screen.History,
+                selectedContainerColor = activePillColor,
+                selectedContentColor = activeContentColor,
+                unselectedContentColor = inactiveColor,
+                onClick = onHistoryClick
+            )
+            NavPillItem(
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Bookmark,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                },
+                selected = currentScreen == Screen.Bookmarks,
+                selectedContainerColor = activePillColor,
+                selectedContentColor = activeContentColor,
+                unselectedContentColor = inactiveColor,
+                onClick = onBookmarksClick
+            )
+            NavPillItem(
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                },
+                selected = currentScreen == Screen.Settings,
+                selectedContainerColor = activePillColor,
+                selectedContentColor = activeContentColor,
+                unselectedContentColor = inactiveColor,
+                onClick = onSettingsClick
+            )
         }
     }
 }
