@@ -490,6 +490,10 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setUseOfflineMode(enabled) }
     }
 
+    fun setSelectedAnkiDeckName(name: String) {
+        viewModelScope.launch { settingsStore.setSelectedAnkiDeckName(name) }
+    }
+
     fun dismissIntroduction() {
         if (settings.value.hasSeenIntroduction || introDismissedThisSession) return
         introDismissedThisSession = true

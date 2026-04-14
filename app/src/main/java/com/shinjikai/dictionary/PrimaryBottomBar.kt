@@ -46,18 +46,18 @@ fun PrimaryBottomBar(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 6.dp)
-            .height(72.dp),
-        shape = RoundedCornerShape(30.dp),
+            .padding(horizontal = 20.dp, vertical = 4.dp)
+            .height(64.dp),
+        shape = RoundedCornerShape(26.dp),
         color = barColor,
-        tonalElevation = 3.dp,
-        shadowElevation = 9.dp
+        tonalElevation = 2.dp,
+        shadowElevation = 7.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically
         ) {
             NavPillItem(
@@ -144,13 +144,13 @@ private fun RowScope.NavPillItem(
         onClick = onClick,
         modifier = Modifier
             .weight(1f)
-            .height(54.dp)
-            .widthIn(min = 54.dp),
-        shape = RoundedCornerShape(22.dp),
+            .height(48.dp)
+            .widthIn(min = 48.dp),
+        shape = RoundedCornerShape(18.dp),
         color = containerColor.value
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically
         ) {

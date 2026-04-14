@@ -120,4 +120,18 @@
     <string name="detail_add_to_anki_not_installed">AnkiDroid &#x063A;&#x064A;&#x0631; &#x0645;&#x062B;&#x0628;&#x062A; &#x0639;&#x0644;&#x0649; &#x0627;&#x0644;&#x062C;&#x0647;&#x0627;&#x0632;.</string>
     <string name="search_try_japanese_words">&#x062C;&#x0631;&#x0651;&#x0628; &#x0643;&#x0644;&#x0645;&#x0627;&#x062A; &#x064A;&#x0627;&#x0628;&#x0627;&#x0646;&#x064A;&#x0629; &#x0645;&#x062B;&#x0644;</string>
     <string name="search_try_other_words">&#x062C;&#x0631;&#x0651;&#x0628; &#x0643;&#x0644;&#x0645;&#x0627;&#x062A; &#x0623;&#x062E;&#x0631;&#x0649;</string>
+    <string name="settings_anki_section_title">Anki</string>
+    <string name="settings_anki_exporter_title">&#x0645;&#x0635;&#x062F;&#x0651;&#x0631; Anki</string>
+    <string name="settings_anki_exporter_description">&#x0627;&#x062E;&#x062A;&#x0631; &#x0627;&#x0644;&#x0631;&#x0632;&#x0645;&#x0629; &#x0627;&#x0644;&#x062A;&#x064A; &#x0633;&#x062A;&#x064F;&#x0635;&#x062F;&#x0651;&#x0631; &#x0625;&#x0644;&#x064A;&#x0647;&#x0627; &#x0627;&#x0644;&#x0643;&#x0644;&#x0645;&#x0627;&#x062A;.</string>
+    <string name="settings_anki_exporter_open">&#x0641;&#x062A;&#x062D; &#x0625;&#x0639;&#x062F;&#x0627;&#x062F;&#x0627;&#x062A; &#x0645;&#x0635;&#x062F;&#x0651;&#x0631; Anki</string>
+    <string name="settings_anki_selected_deck">&#x0627;&#x0644;&#x0631;&#x0632;&#x0645;&#x0629; &#x0627;&#x0644;&#x0645;&#x062D;&#x062F;&#x062F;&#x0629;</string>
+    <string name="settings_anki_selected_deck_description">&#x0633;&#x064A;&#x062A;&#x0645; &#x062A;&#x0635;&#x062F;&#x064A;&#x0631; &#x0627;&#x0644;&#x0643;&#x0644;&#x0645;&#x0627;&#x062A; &#x0627;&#x0644;&#x062C;&#x062F;&#x064A;&#x062F;&#x0629; &#x0645;&#x0646; &#x0635;&#x0641;&#x062D;&#x0629; &#x0627;&#x0644;&#x0645;&#x0639;&#x0646;&#x0649; &#x0625;&#x0644;&#x0649; &#x0647;&#x0630;&#x0647; &#x0627;&#x0644;&#x0631;&#x0632;&#x0645;&#x0629;.</string>
+    <string name="settings_anki_allow_access_button">&#x0627;&#x0644;&#x0633;&#x0645;&#x0627;&#x062D; &#x0628;&#x0627;&#x0644;&#x0648;&#x0635;&#x0648;&#x0644; &#x0625;&#x0644;&#x0649; &#x0631;&#x0632;&#x0645; Anki</string>
+    <string name="settings_anki_no_decks">&#x0644;&#x0627; &#x062A;&#x0648;&#x062C;&#x062F; &#x0631;&#x0632;&#x0645; Anki &#x062D;&#x062A;&#x0649; &#x0627;&#x0644;&#x0622;&#x0646;.</string>
+    <string name="settings_anki_permission_required">&#x064A;&#x0644;&#x0632;&#x0645; &#x0645;&#x0646;&#x062D; &#x0627;&#x0644;&#x0625;&#x0630;&#x0646; &#x0644;&#x062A;&#x062D;&#x0645;&#x064A;&#x0644; &#x0627;&#x0644;&#x0631;&#x0632;&#x0645; &#x0627;&#x0644;&#x0645;&#x0648;&#x062C;&#x0648;&#x062F;&#x0629;.</string>
+    <string name="settings_anki_install_required">&#x062B;&#x0628;&#x0651;&#x062A; AnkiDroid &#x0623;&#x0648;&#x0644;&#x0627;&#x064B; &#x0644;&#x0639;&#x0631;&#x0636; &#x0627;&#x0644;&#x0631;&#x0632;&#x0645; &#x0627;&#x0644;&#x0645;&#x0648;&#x062C;&#x0648;&#x062F;&#x0629;.</string>
+    <string name="settings_anki_allow_access">&#x0627;&#x0633;&#x0645;&#x062D; &#x0644;&#x0644;&#x062A;&#x0637;&#x0628;&#x064A;&#x0642; &#x0628;&#x0627;&#x0644;&#x0648;&#x0635;&#x0648;&#x0644; &#x0625;&#x0644;&#x0649; Anki &#x0644;&#x062A;&#x062D;&#x0645;&#x064A;&#x0644; &#x0627;&#x0644;&#x0631;&#x0632;&#x0645;.</string>
+    <string name="settings_anki_available_decks">&#x0627;&#x0644;&#x0631;&#x0632;&#x0645; &#x0627;&#x0644;&#x0645;&#x062A;&#x0627;&#x062D;&#x0629;</string>
+    <string name="settings_anki_deck_field_label">&#x0627;&#x062E;&#x062A;&#x0631; &#x0627;&#x0644;&#x0631;&#x0632;&#x0645;&#x0629;</string>
+    <string name="settings_anki_use_default_deck">&#x0627;&#x0633;&#x062A;&#x062E;&#x062F;&#x0627;&#x0645; &#x0631;&#x0632;&#x0645;&#x0629; Shinjikai &#x0627;&#x0644;&#x0627;&#x0641;&#x062A;&#x0631;&#x0627;&#x0636;&#x064A;&#x0629;</string>
 </resources>

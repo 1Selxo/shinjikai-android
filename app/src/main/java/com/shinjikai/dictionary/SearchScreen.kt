@@ -1,6 +1,7 @@
 package com.shinjikai.dictionary
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +49,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.consumePositionChange
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -99,6 +102,30 @@ fun SearchScreenContent(
     val showLanding = !hasActiveSearch && uiState.term.isBlank() && !isRefreshing && refreshError == null
     val showNoResults =
         hasActiveSearch && uiState.term.isNotBlank() && lazyResults.itemCount == 0 && !isRefreshing && refreshError == null
+    val contentSwipeModifier = Modifier.pointerInput(useOfflineMode, hasOfflineDictionary) {
+        val swipeThresholdPx = 24.dp.toPx()
+        var accumulatedDrag = 0f
+        detectHorizontalDragGestures(
+            onHorizontalDrag = { change, dragAmount ->
+                accumulatedDrag += dragAmount
+                change.consumePositionChange()
+            },
+            onDragEnd = {
+                if (kotlin.math.abs(accumulatedDrag) >= swipeThresholdPx) {
+                    val targetOfflineMode = !useOfflineMode
+                    if (targetOfflineMode && !hasOfflineDictionary) {
+                        showOfflineDownloadPrompt = true
+                    } else {
+                        viewModel.setUseOfflineMode(targetOfflineMode)
+                    }
+                }
+                accumulatedDrag = 0f
+            },
+            onDragCancel = {
+                accumulatedDrag = 0f
+            }
+        )
+    }
     val landingSuggestions = remember {
         listOf(
             "猫",
@@ -144,8 +171,8 @@ fun SearchScreenContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             SearchTopDock(
                 term = uiState.term,
@@ -184,8 +211,8 @@ fun SearchScreenContent(
             when {
                 showLanding -> {
                     Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(18.dp)
+                        modifier = contentSwipeModifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         if (!useOfflineMode) {
                             LandingSuggestions(
@@ -206,7 +233,7 @@ fun SearchScreenContent(
                             LazyColumn(
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(vertical = 4.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 items(
                                     items = uiState.offlinePreviewItems,
@@ -238,10 +265,10 @@ fun SearchScreenContent(
 
                 showNoResults -> {
                     Column(
-                        modifier = Modifier
+                        modifier = contentSwipeModifier
                             .weight(1f)
                             .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
@@ -268,7 +295,7 @@ fun SearchScreenContent(
 
                 else -> {
                     LazyColumn(
-                        modifier = Modifier.weight(1f),
+                        modifier = contentSwipeModifier.weight(1f),
                         state = resultsListState,
                         contentPadding = PaddingValues(vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -408,8 +435,8 @@ private fun SearchTopDock(
     }
 
     Column(
-        modifier = modifier.padding(vertical = if (isImeVisible) 6.dp else 4.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        modifier = modifier.padding(vertical = if (isImeVisible) 2.dp else 0.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         activeCategoryName?.let {
             CategorySearchBanner(
@@ -420,9 +447,9 @@ private fun SearchTopDock(
 
         if (activeCategoryName == null) {
             Surface(
-                shape = RoundedCornerShape(22.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
-                tonalElevation = 2.dp
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                tonalElevation = 0.dp
             ) {
                 SearchModeTabs(
                     useOfflineMode = useOfflineMode,
@@ -432,10 +459,10 @@ private fun SearchTopDock(
         }
 
         Surface(
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 4.dp,
-            shadowElevation = 10.dp
+            tonalElevation = 2.dp,
+            shadowElevation = 4.dp
         ) {
             OutlinedTextField(
                 value = term,
@@ -445,8 +472,15 @@ private fun SearchTopDock(
                     .focusRequester(focusRequester)
                     .onGloballyPositioned { onFieldReady() },
                 singleLine = true,
-                placeholder = { Text(stringResource(R.string.search_hint)) },
-                shape = RoundedCornerShape(28.dp),
+                placeholder = {
+                    Text(
+                        text = stringResource(R.string.search_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                shape = RoundedCornerShape(22.dp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onRunSearch() }),
                 leadingIcon = {
@@ -466,8 +500,8 @@ private fun SearchTopDock(
                     }
                 },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.10f),
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface
                 )
@@ -491,7 +525,7 @@ private fun LandingSuggestions(
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -508,21 +542,21 @@ private fun LandingSuggestions(
             )
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 suggestions.forEach { suggestion ->
                     Surface(
                         onClick = { onSuggestionClick(suggestion) },
                         shape = RoundedCornerShape(999.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-                        tonalElevation = 2.dp
+                        tonalElevation = 1.dp
                     ) {
                         Text(
                             text = suggestion,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp),
                             style = MaterialTheme.typography.titleMedium,
-                            fontSize = 18.sp,
+                            fontSize = 15.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -594,13 +628,13 @@ private fun SearchModeTabs(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.48f)
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 4.dp)
+                .padding(horizontal = 3.dp, vertical = 3.dp)
         ) {
             options.forEach { (label, isOfflineOption) ->
                 val selected = useOfflineMode == isOfflineOption
@@ -608,17 +642,17 @@ private fun SearchModeTabs(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 2.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = if (selected) selectedBackground else Color.Transparent,
                     onClick = { onModeSelected(isOfflineOption) }
                 ) {
                     Box(
-                        modifier = Modifier.padding(vertical = 10.dp),
+                        modifier = Modifier.padding(vertical = 7.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = label,
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = if (selected) selectedColor else unselectedColor
                         )

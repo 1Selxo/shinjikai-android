@@ -180,7 +180,7 @@ data class AnkiNoteContent(
 }
 
 sealed interface AnkiAddResult {
-    data object Added : AnkiAddResult
+    data class Added(val hasAudio: Boolean) : AnkiAddResult
     data object PermissionRequired : AnkiAddResult
     data object OpenedShareFallback : AnkiAddResult
     data object AnkiNotInstalled : AnkiAddResult
@@ -194,9 +194,19 @@ object AnkiExporter {
     fun hasDatabasePermission(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, ANKIDROID_PERMISSION) == PackageManager.PERMISSION_GRANTED
 
+    fun loadDeckNames(context: Context): List<String> {
+        if (!isAnkiDroidInstalled(context)) return emptyList()
+        if (!canRequestDirectAdd(context)) return emptyList()
+        if (!hasDatabasePermission(context)) return emptyList()
+        return AddContentApi(context).deckList.values
+            .filter { it.isNotBlank() }
+            .sorted()
+    }
+
     suspend fun addNote(
         context: Context,
         note: AnkiNoteContent,
+        deckName: String = SHINJIKAI_DECK_NAME,
         textToSpeech: TextToSpeech? = null,
         canSpeakJapanese: Boolean = false
     ): AnkiAddResult {
@@ -216,8 +226,9 @@ object AnkiExporter {
 
         return runCatching {
             val api = AddContentApi(context)
-            val deckId = api.deckList.entries.firstOrNull { it.value == SHINJIKAI_DECK_NAME }?.key
-                ?: api.addNewDeck(SHINJIKAI_DECK_NAME)
+            val normalizedDeckName = deckName.trim().ifBlank { SHINJIKAI_DECK_NAME }
+            val deckId = api.deckList.entries.firstOrNull { it.value == normalizedDeckName }?.key
+                ?: api.addNewDeck(normalizedDeckName)
             val modelId = api.modelList.entries.firstOrNull { it.value == SHINJIKAI_MODEL_NAME }?.key
                 ?: api.addNewCustomModel(
                     SHINJIKAI_MODEL_NAME,
@@ -234,7 +245,7 @@ object AnkiExporter {
                 shareToAnki(context, note)
             } else {
                 val noteId = api.addNote(modelId, deckId, note.fields(audioField), null)
-                if (noteId > 0L) AnkiAddResult.Added else shareToAnki(context, note)
+                if (noteId > 0L) AnkiAddResult.Added(hasAudio = audioField.isNotBlank()) else shareToAnki(context, note)
             }
         }.getOrElse {
             if (it is SecurityException) {

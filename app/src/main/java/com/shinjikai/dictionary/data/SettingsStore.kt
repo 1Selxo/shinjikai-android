@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import java.io.File
 import java.io.IOException
@@ -27,6 +28,7 @@ class SettingsStore(
         val USE_DYNAMIC_COLOR = booleanPreferencesKey("use_dynamic_color")
         val USE_OFFLINE_MODE = booleanPreferencesKey("use_offline_mode")
         val HAS_SEEN_INTRODUCTION = booleanPreferencesKey("has_seen_introduction")
+        val SELECTED_ANKI_DECK_NAME = stringPreferencesKey("selected_anki_deck_name")
     }
 
     /**
@@ -40,7 +42,8 @@ class SettingsStore(
             useOfflineMode = cachePrefs.getBoolean("use_offline_mode", false),
             hasSeenIntroduction = resolveHasSeenIntroduction(
                 legacySeen = cachePrefs.getBoolean("has_seen_introduction", false)
-            )
+            ),
+            selectedAnkiDeckName = cachePrefs.getString("selected_anki_deck_name", "Shinjikai") ?: "Shinjikai"
         )
     }
 
@@ -57,7 +60,8 @@ class SettingsStore(
                 useOfflineMode = prefs[Keys.USE_OFFLINE_MODE] ?: false,
                 hasSeenIntroduction = resolveHasSeenIntroduction(
                     legacySeen = prefs[Keys.HAS_SEEN_INTRODUCTION] ?: false
-                )
+                ),
+                selectedAnkiDeckName = prefs[Keys.SELECTED_ANKI_DECK_NAME] ?: "Shinjikai"
             )
         }
         .onEach { settings ->
@@ -67,6 +71,7 @@ class SettingsStore(
                 .putBoolean("use_dynamic_color", settings.useDynamicColor)
                 .putBoolean("use_offline_mode", settings.useOfflineMode)
                 .putBoolean("has_seen_introduction", settings.hasSeenIntroduction)
+                .putString("selected_anki_deck_name", settings.selectedAnkiDeckName)
                 .apply()
             syncIntroductionMarker(settings.hasSeenIntroduction)
         }
@@ -90,6 +95,12 @@ class SettingsStore(
         context.settingsDataStore.edit { prefs -> prefs[Keys.HAS_SEEN_INTRODUCTION] = seen }
         cachePrefs.edit().putBoolean("has_seen_introduction", seen).apply()
         syncIntroductionMarker(seen)
+    }
+
+    suspend fun setSelectedAnkiDeckName(name: String) {
+        val normalized = name.trim().ifBlank { "Shinjikai" }
+        context.settingsDataStore.edit { prefs -> prefs[Keys.SELECTED_ANKI_DECK_NAME] = normalized }
+        cachePrefs.edit().putString("selected_anki_deck_name", normalized).apply()
     }
 
     private fun resolveHasSeenIntroduction(legacySeen: Boolean): Boolean {

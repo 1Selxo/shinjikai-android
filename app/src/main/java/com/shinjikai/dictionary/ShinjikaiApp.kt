@@ -404,6 +404,10 @@ fun ShinjikaiApp(
                                     focusManager.clearFocus()
                                     navController.navigate(AppRoute.LocalDictionary.route)
                                 },
+                                onOpenAnkiExporterSettings = {
+                                    focusManager.clearFocus()
+                                    navController.navigate(AppRoute.AnkiExporterSettings.route)
+                                },
                                 onSearchClick = handleSearchTabClick,
                                 onHistoryClick = {
                                     focusManager.clearFocus()
@@ -433,6 +437,13 @@ fun ShinjikaiApp(
                                         )
                                     )
                                 },
+                                onGoBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(AppRoute.AnkiExporterSettings.route) {
+                            AnkiExporterSettingsScreenContent(
+                                selectedDeckName = viewModel.settingsUiState.settings.selectedAnkiDeckName,
+                                onSelectDeck = viewModel::setSelectedAnkiDeckName,
                                 onGoBack = { navController.popBackStack() }
                             )
                         }
@@ -476,6 +487,7 @@ fun ShinjikaiApp(
                                 useOfflineMode = settings.useOfflineMode,
                                 canSpeakJapanese = canSpeakJapanese,
                                 textToSpeech = textToSpeech,
+                                selectedAnkiDeckName = settings.selectedAnkiDeckName,
                                 clipboardManager = clipboardManager,
                                 focusManager = focusManager,
                                 viewModel = viewModel,
@@ -710,6 +722,7 @@ private fun DetailScreenContent(
     useOfflineMode: Boolean,
     canSpeakJapanese: Boolean,
     textToSpeech: TextToSpeech?,
+    selectedAnkiDeckName: String,
     clipboardManager: androidx.compose.ui.platform.ClipboardManager,
     focusManager: androidx.compose.ui.focus.FocusManager,
     viewModel: ShinjikaiViewModel,
@@ -726,6 +739,7 @@ private fun DetailScreenContent(
     val addToAnkiFailedMessage = stringResource(R.string.detail_add_to_anki_failed)
     val addToAnkiOpenedShareMessage = stringResource(R.string.detail_add_to_anki_opened_share)
     val addToAnkiNotInstalledMessage = stringResource(R.string.detail_add_to_anki_not_installed)
+    val addToAnkiNoAudioMessage = "Added to Anki without audio."
     val coroutineScope = rememberCoroutineScope()
     val ankiNote = remember(useOfflineMode, detailState.selectedItem, detailState.details) {
         buildDetailAnkiNoteContent(
@@ -744,9 +758,13 @@ private fun DetailScreenContent(
     }
     fun handleAnkiResult(result: AnkiAddResult, selectedItemId: Int?) {
         when (result) {
-            AnkiAddResult.Added -> {
+            is AnkiAddResult.Added -> {
                 ankiAddedItemId = selectedItemId
-                Toast.makeText(context, addToAnkiSuccessMessage, Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    if (result.hasAudio) addToAnkiSuccessMessage else addToAnkiNoAudioMessage,
+                    Toast.LENGTH_SHORT
+                ).show()
             }
             AnkiAddResult.OpenedShareFallback ->
                 Toast.makeText(context, addToAnkiOpenedShareMessage, Toast.LENGTH_SHORT).show()
@@ -762,6 +780,7 @@ private fun DetailScreenContent(
             val result = AnkiExporter.addNote(
                 context = context,
                 note = note,
+                deckName = selectedAnkiDeckName,
                 textToSpeech = textToSpeech,
                 canSpeakJapanese = canSpeakJapanese
             )

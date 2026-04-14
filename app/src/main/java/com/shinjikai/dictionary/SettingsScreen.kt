@@ -3,6 +3,8 @@ package com.shinjikai.dictionary
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -36,28 +38,40 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.shinjikai.dictionary.integration.ANKIDROID_PERMISSION
+import com.shinjikai.dictionary.integration.AnkiExporter
 import com.shinjikai.dictionary.ui.Screen
 import com.shinjikai.dictionary.ui.SettingsUiState
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
@@ -75,6 +89,7 @@ fun SettingsScreenContent(
     uiState: SettingsUiState,
     viewModel: ShinjikaiViewModel,
     onOpenLocalDictionary: () -> Unit,
+    onOpenAnkiExporterSettings: () -> Unit,
     onSearchClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onBookmarksClick: () -> Unit,
@@ -128,6 +143,29 @@ fun SettingsScreenContent(
                 uiState = uiState,
                 onClick = onOpenLocalDictionary
             )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    SettingsSectionTitle(
+                        icon = Icons.Filled.TaskAlt,
+                        title = stringResource(R.string.settings_anki_section_title)
+                    )
+                    SettingsLinkRow(
+                        painterRes = R.drawable.ic_anki,
+                        title = stringResource(R.string.settings_anki_exporter_title),
+                        description = stringResource(R.string.settings_anki_exporter_description),
+                        contentDescription = stringResource(R.string.settings_anki_exporter_open),
+                        onClick = onOpenAnkiExporterSettings
+                    )
+                }
+            }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -247,6 +285,249 @@ fun LocalDictionaryScreenContent(
                     )
                 }
             )
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+fun AnkiExporterSettingsScreenContent(
+    selectedDeckName: String,
+    onSelectDeck: (String) -> Unit,
+    onGoBack: () -> Unit
+) {
+    val context = LocalContext.current
+    var availableDecks by remember { mutableStateOf<List<String>>(emptyList()) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
+    var deckMenuExpanded by remember { mutableStateOf(false) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        availableDecks = if (granted) {
+            AnkiExporter.loadDeckNames(context)
+        } else {
+            emptyList()
+        }
+        statusMessage = when {
+            granted && availableDecks.isEmpty() -> context.getString(R.string.settings_anki_no_decks)
+            granted -> null
+            else -> context.getString(R.string.settings_anki_permission_required)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        when {
+            !AnkiExporter.canRequestDirectAdd(context) ->
+                statusMessage = context.getString(R.string.settings_anki_install_required)
+            AnkiExporter.hasDatabasePermission(context) -> {
+                availableDecks = AnkiExporter.loadDeckNames(context)
+                if (availableDecks.isEmpty()) {
+                    statusMessage = context.getString(R.string.settings_anki_no_decks)
+                }
+            }
+            else -> statusMessage = context.getString(R.string.settings_anki_allow_access)
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.settings_anki_exporter_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onGoBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.nav_back)
+                        )
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.settings_anki_selected_deck),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(selectedDeckName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        stringResource(R.string.settings_anki_selected_deck_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+                    )
+                }
+            }
+
+            if (!AnkiExporter.hasDatabasePermission(context) && AnkiExporter.canRequestDirectAdd(context)) {
+                Button(
+                    onClick = { permissionLauncher.launch(ANKIDROID_PERMISSION) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.settings_anki_allow_access_button))
+                }
+            }
+
+            statusMessage?.let { message ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Text(
+                        text = message,
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            if (availableDecks.isNotEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            stringResource(R.string.settings_anki_available_decks),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        ExposedDropdownMenuBox(
+                            expanded = deckMenuExpanded,
+                            onExpandedChange = { deckMenuExpanded = !deckMenuExpanded }
+                        ) {
+                            OutlinedTextField(
+                                value = selectedDeckName,
+                                onValueChange = {},
+                                readOnly = true,
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .fillMaxWidth(),
+                                label = { Text(stringResource(R.string.settings_anki_deck_field_label)) },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = deckMenuExpanded) }
+                            )
+                            ExposedDropdownMenu(
+                                expanded = deckMenuExpanded,
+                                onDismissRequest = { deckMenuExpanded = false }
+                            ) {
+                                availableDecks.forEach { deckName ->
+                                    DropdownMenuItem(
+                                        text = { Text(deckName) },
+                                        onClick = {
+                                            onSelectDeck(deckName)
+                                            deckMenuExpanded = false
+                                        },
+                                        leadingIcon = {
+                                            if (deckName == selectedDeckName) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.CheckCircle,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            OutlinedButton(
+                onClick = { onSelectDeck("Shinjikai") },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.settings_anki_use_default_deck))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsLinkRow(
+    icon: ImageVector? = null,
+    painterRes: Int? = null,
+    title: String,
+    description: String,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            when {
+                painterRes != null -> SettingsLeadingPainterIcon(painterRes = painterRes)
+                icon != null -> SettingsLeadingIcon(icon = icon)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+                )
+            }
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+            contentDescription = contentDescription
+        )
+    }
+}
+
+@Composable
+private fun SettingsLeadingPainterIcon(painterRes: Int) {
+    Box(
+        modifier = Modifier.size(36.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        ) {
+            Box(
+                modifier = Modifier.size(36.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(painterRes),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }
