@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -72,7 +71,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.shinjikai.dictionary.integration.ANKIDROID_PERMISSION
 import com.shinjikai.dictionary.integration.AnkiExporter
-import com.shinjikai.dictionary.ui.Screen
 import com.shinjikai.dictionary.ui.SettingsUiState
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
 
@@ -84,16 +82,11 @@ private data class OfflineImportStatusUi(
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun SettingsScreenContent(
-    appVersionLabel: String,
     supportsDynamicColor: Boolean,
     uiState: SettingsUiState,
     viewModel: ShinjikaiViewModel,
     onOpenLocalDictionary: () -> Unit,
     onOpenAnkiExporterSettings: () -> Unit,
-    onSearchClick: () -> Unit,
-    onHistoryClick: () -> Unit,
-    onBookmarksClick: () -> Unit,
-    onSettingsClick: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -210,32 +203,6 @@ fun SettingsScreenContent(
                     )
                 }
             }
-            }
-
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "${stringResource(R.string.settings_about_version)}: $appVersionLabel",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
-                    )
-                }
-                PrimaryBottomBar(
-                    currentScreen = Screen.Settings,
-                    onSearchClick = onSearchClick,
-                    onHistoryClick = onHistoryClick,
-                    onBookmarksClick = onBookmarksClick,
-                    onSettingsClick = onSettingsClick
-                )
             }
         }
     }

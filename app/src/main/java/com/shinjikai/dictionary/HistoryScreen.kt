@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
@@ -50,11 +49,7 @@ import com.shinjikai.dictionary.ui.ShinjikaiViewModel
 fun HistoryScreenContent(
     uiState: SearchUiState,
     viewModel: ShinjikaiViewModel,
-    onSearchClick: () -> Unit,
     onOpenHistoryTerm: (String) -> Unit,
-    onHistoryClick: () -> Unit,
-    onBookmarksClick: () -> Unit,
-    onSettingsClick: () -> Unit
 ) {
     var pendingDeleteTerm by remember { mutableStateOf<String?>(null) }
     var pendingClearAllHistory by remember { mutableStateOf(false) }
@@ -191,16 +186,6 @@ fun HistoryScreenContent(
                 }
             }
 
-            PrimaryBottomBar(
-                currentScreen = com.shinjikai.dictionary.ui.Screen.History,
-                onSearchClick = onSearchClick,
-                onHistoryClick = onHistoryClick,
-                onBookmarksClick = onBookmarksClick,
-                onSettingsClick = onSettingsClick,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-            )
         }
     }
 

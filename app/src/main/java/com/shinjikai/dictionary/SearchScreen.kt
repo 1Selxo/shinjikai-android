@@ -13,8 +13,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.isImeVisible
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -24,6 +24,17 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -48,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.consumePositionChange
 import androidx.compose.ui.input.pointer.pointerInput
@@ -67,7 +79,6 @@ import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.shinjikai.dictionary.data.SearchItem
 import com.shinjikai.dictionary.ui.ResultMode
-import com.shinjikai.dictionary.ui.Screen
 import com.shinjikai.dictionary.ui.SearchUiState
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
 import kotlinx.coroutines.flow.Flow
@@ -82,9 +93,6 @@ fun SearchScreenContent(
     viewModel: ShinjikaiViewModel,
     uiState: SearchUiState,
     searchResults: Flow<PagingData<SearchItem>>,
-    onSearchClick: () -> Unit,
-    onHistoryClick: () -> Unit,
-    onBookmarksClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onOpenDetails: (SearchItem) -> Unit
 ) {
@@ -154,226 +162,234 @@ fun SearchScreenContent(
         resultsListState.scrollToItem(0)
     }
 
-    Scaffold(
-        containerColor = Color.Transparent,
-        bottomBar = {
-            PrimaryBottomBar(
-                currentScreen = Screen.Search,
-                onSearchClick = onSearchClick,
-                onHistoryClick = onHistoryClick,
-                onBookmarksClick = onBookmarksClick,
-                onSettingsClick = onSettingsClick,
-                modifier = Modifier.navigationBarsPadding()
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            SearchTopDock(
-                term = uiState.term,
-                useOfflineMode = useOfflineMode,
-                activeCategoryName = uiState.activeCategoryName,
-                searchFocusNonce = searchFocusNonce,
-                onTermChange = { viewModel.term = it },
-                onRunSearch = {
-                    focusManager.clearFocus()
-                    viewModel.runSearch()
-                },
-                onClearTerm = { viewModel.runSearchForTerm("") },
-                onClearCategory = { viewModel.clearCategorySearch() },
-                onModeSelected = { selectedOffline ->
-                    if (selectedOffline && !hasOfflineDictionary) {
-                        showOfflineDownloadPrompt = true
-                    } else if (selectedOffline != useOfflineMode) {
-                        viewModel.setUseOfflineMode(selectedOffline)
+    Scaffold(containerColor = Color.Transparent) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SearchTopDock(
+                    term = uiState.term,
+                    useOfflineMode = useOfflineMode,
+                    activeCategoryName = uiState.activeCategoryName,
+                    searchFocusNonce = searchFocusNonce,
+                    onTermChange = { viewModel.term = it },
+                    onRunSearch = {
+                        focusManager.clearFocus()
+                        viewModel.runSearch()
+                    },
+                    onClearTerm = { viewModel.runSearchForTerm("") },
+                    onClearCategory = { viewModel.clearCategorySearch() },
+                    onModeSelected = { selectedOffline ->
+                        if (selectedOffline && !hasOfflineDictionary) {
+                            showOfflineDownloadPrompt = true
+                        } else if (selectedOffline != useOfflineMode) {
+                            viewModel.setUseOfflineMode(selectedOffline)
+                        }
+                    },
+                    focusRequester = searchFocusRequester,
+                    onFieldReady = { isSearchFieldReady = true },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (isRefreshing) {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
-                },
-                focusRequester = searchFocusRequester,
-                onFieldReady = { isSearchFieldReady = true },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            if (isRefreshing) {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
                 }
-            }
 
-            refreshError?.let { message ->
-                Text(text = message, color = MaterialTheme.colorScheme.error)
-            }
+                refreshError?.let { message ->
+                    Text(text = message, color = MaterialTheme.colorScheme.error)
+                }
 
-            when {
-                showLanding -> {
-                    Column(
-                        modifier = contentSwipeModifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        if (!useOfflineMode) {
-                            LandingSuggestions(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                appName = appName,
-                                suggestions = landingSuggestions,
-                                onSuggestionClick = { suggestion ->
-                                    viewModel.term = suggestion
-                                    focusManager.clearFocus()
-                                    viewModel.runSearchForTerm(suggestion)
+                AnimatedContent(
+                    targetState = useOfflineMode,
+                    modifier = Modifier.weight(1f),
+                    transitionSpec = {
+                        val forward = targetState != initialState
+                        (
+                            slideInHorizontally(
+                                animationSpec = tween(durationMillis = 240),
+                                initialOffsetX = { fullWidth -> if (forward) fullWidth / 10 else -fullWidth / 10 }
+                            ) + fadeIn(animationSpec = tween(durationMillis = 220))
+                        ).togetherWith(
+                            slideOutHorizontally(
+                                animationSpec = tween(durationMillis = 200),
+                                targetOffsetX = { fullWidth -> if (forward) -fullWidth / 12 else fullWidth / 12 }
+                            ) + fadeOut(animationSpec = tween(durationMillis = 160))
+                        ).using(SizeTransform(clip = false))
+                    },
+                    label = "searchModeContent"
+                ) {
+                    when {
+                        showLanding -> {
+                            Column(
+                                modifier = contentSwipeModifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                if (!useOfflineMode) {
+                                    LandingSuggestions(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .weight(1f),
+                                        appName = appName,
+                                        suggestions = landingSuggestions,
+                                        onSuggestionClick = { suggestion ->
+                                            viewModel.term = suggestion
+                                            focusManager.clearFocus()
+                                            viewModel.runSearchForTerm(suggestion)
+                                        }
+                                    )
                                 }
-                            )
+
+                                if (useOfflineMode && uiState.offlinePreviewItems.isNotEmpty()) {
+                                    LazyColumn(
+                                        modifier = Modifier.weight(1f),
+                                        contentPadding = PaddingValues(vertical = 4.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        items(
+                                            items = uiState.offlinePreviewItems,
+                                            key = { it.id }
+                                        ) { item ->
+                                            OfflinePreviewCard(
+                                                item = item,
+                                                onClick = { onOpenDetails(item) }
+                                            )
+                                        }
+                                    }
+                                } else if (useOfflineMode) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .weight(1f),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = appName,
+                                            style = MaterialTheme.typography.headlineMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
                         }
 
-                        if (useOfflineMode && uiState.offlinePreviewItems.isNotEmpty()) {
+                        showNoResults -> {
+                            Column(
+                                modifier = contentSwipeModifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.search_no_results),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    textAlign = TextAlign.Center
+                                )
+                                if (!useOfflineMode && uiState.activeCategoryId == null) {
+                                    LandingSuggestions(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        appName = appName,
+                                        suggestions = landingSuggestions,
+                                        title = stringResource(R.string.search_try_other_words),
+                                        onSuggestionClick = { suggestion ->
+                                            viewModel.term = suggestion
+                                            focusManager.clearFocus()
+                                            viewModel.runSearchForTerm(suggestion)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        else -> {
                             LazyColumn(
-                                modifier = Modifier.weight(1f),
+                                modifier = contentSwipeModifier.fillMaxSize(),
+                                state = resultsListState,
                                 contentPadding = PaddingValues(vertical = 4.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 items(
-                                    items = uiState.offlinePreviewItems,
-                                    key = { it.id }
-                                ) { item ->
-                                    OfflinePreviewCard(
-                                        item = item,
-                                        onClick = { onOpenDetails(item) }
-                                    )
-                                }
-                            }
-                        } else if (useOfflineMode) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = appName,
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-                }
-
-                showNoResults -> {
-                    Column(
-                        modifier = contentSwipeModifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = stringResource(R.string.search_no_results),
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center
-                        )
-                        if (!useOfflineMode && uiState.activeCategoryId == null) {
-                            LandingSuggestions(
-                                modifier = Modifier.fillMaxWidth(),
-                                appName = appName,
-                                suggestions = landingSuggestions,
-                                title = stringResource(R.string.search_try_other_words),
-                                onSuggestionClick = { suggestion ->
-                                    viewModel.term = suggestion
-                                    focusManager.clearFocus()
-                                    viewModel.runSearchForTerm(suggestion)
-                                }
-                            )
-                        }
-                    }
-                }
-
-                else -> {
-                    LazyColumn(
-                        modifier = contentSwipeModifier.weight(1f),
-                        state = resultsListState,
-                        contentPadding = PaddingValues(vertical = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(
-                            count = lazyResults.itemCount,
-                            key = { index -> lazyResults[index]?.id ?: "result-$index" }
-                        ) { index ->
-                            val item = lazyResults[index] ?: return@items
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onOpenDetails(item) },
-                                shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                            ) {
-                                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp)) {
-                                    Text(
-                                        text = item.kana,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
-                                    )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = item.primaryWriting.ifBlank { item.kana },
-                                            style = MaterialTheme.typography.headlineMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        CommonnessBadge(difficulty = item.difficulty)
-                                    }
-                                    Text(
-                                        text = forceRtlText(
-                                            if (useOfflineMode) {
-                                                formatOfflineSearchPreview(item.meaningSummary)
-                                            } else {
-                                                formatOnlineSearchPreview(item.meaningSummary)
-                                            }
-                                        ),
-                                        style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Rtl),
-                                        textAlign = TextAlign.Right,
-                                        maxLines = if (useOfflineMode || uiState.activeCategoryId != null) 1 else Int.MAX_VALUE,
-                                        overflow = TextOverflow.Ellipsis,
+                                    count = lazyResults.itemCount,
+                                    key = { index -> lazyResults[index]?.id ?: "result-$index" }
+                                ) { index ->
+                                    val item = lazyResults[index] ?: return@items
+                                    Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(top = 6.dp)
-                                    )
+                                            .clickable { onOpenDetails(item) },
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                    ) {
+                                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp)) {
+                                            Text(
+                                                text = item.kana,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
+                                            )
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = item.primaryWriting.ifBlank { item.kana },
+                                                    style = MaterialTheme.typography.headlineMedium,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                CommonnessBadge(difficulty = item.difficulty)
+                                            }
+                                            Text(
+                                                text = forceRtlText(
+                                                    if (useOfflineMode) {
+                                                        formatOfflineSearchPreview(item.meaningSummary)
+                                                    } else {
+                                                        formatOnlineSearchPreview(item.meaningSummary)
+                                                    }
+                                                ),
+                                                style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Rtl),
+                                                textAlign = TextAlign.Right,
+                                                maxLines = if (useOfflineMode || uiState.activeCategoryId != null) 1 else Int.MAX_VALUE,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(top = 6.dp)
+                                            )
+                                        }
+                                    }
                                 }
-                            }
-                        }
 
-                        if (lazyResults.loadState.append is LoadState.Loading) {
-                            item(key = "append-loading") {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator()
+                                if (lazyResults.loadState.append is LoadState.Loading) {
+                                    item(key = "append-loading") {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 8.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator()
+                                        }
+                                    }
                                 }
-                            }
-                        }
 
-                        (lazyResults.loadState.append as? LoadState.Error)?.let { appendError ->
-                            item(key = "append-error") {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    TextButton(onClick = { lazyResults.retry() }) {
-                                        Text(appendError.error.message ?: stringResource(R.string.detail_retry))
+                                (lazyResults.loadState.append as? LoadState.Error)?.let { appendError ->
+                                    item(key = "append-error") {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 8.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            TextButton(onClick = { lazyResults.retry() }) {
+                                                Text(appendError.error.message ?: stringResource(R.string.detail_retry))
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -381,6 +397,7 @@ fun SearchScreenContent(
                     }
                 }
             }
+
         }
     }
 
@@ -635,26 +652,47 @@ private fun SearchModeTabs(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 3.dp, vertical = 3.dp)
+                .height(42.dp)
         ) {
             options.forEach { (label, isOfflineOption) ->
                 val selected = useOfflineMode == isOfflineOption
+                val containerColor = animateColorAsState(
+                    targetValue = if (selected) selectedBackground else Color.Transparent,
+                    animationSpec = spring(
+                        dampingRatio = 0.82f,
+                        stiffness = 520f
+                    ),
+                    label = "searchModeContainer"
+                )
+                val textScale = animateFloatAsState(
+                    targetValue = if (selected) 1f else 0.96f,
+                    animationSpec = spring(
+                        dampingRatio = 0.78f,
+                        stiffness = 620f
+                    ),
+                    label = "searchModeTextScale"
+                )
                 Surface(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 2.dp),
+                        .padding(horizontal = 2.dp)
+                        .fillMaxSize(),
                     shape = RoundedCornerShape(10.dp),
-                    color = if (selected) selectedBackground else Color.Transparent,
+                    color = containerColor.value,
+                    tonalElevation = if (selected) 1.dp else 0.dp,
+                    shadowElevation = if (selected) 1.dp else 0.dp,
                     onClick = { onModeSelected(isOfflineOption) }
                 ) {
                     Box(
-                        modifier = Modifier.padding(vertical = 7.dp),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = label,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (selected) selectedColor else unselectedColor
+                            color = if (selected) selectedColor else unselectedColor,
+                            modifier = Modifier.scale(textScale.value)
                         )
                     }
                 }

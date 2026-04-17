@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -62,10 +61,6 @@ fun BookmarksScreenContent(
     uiState: BookmarksUiState,
     bookmarkFlow: Flow<PagingData<BookmarkItem>>,
     onOpenBookmarkDetails: (SearchItem) -> Unit,
-    onSearchClick: () -> Unit,
-    onHistoryClick: () -> Unit,
-    onBookmarksClick: () -> Unit,
-    onSettingsClick: () -> Unit
 ) {
     val bookmarks = bookmarkFlow.collectAsLazyPagingItems()
     val locale = Locale.getDefault()
@@ -261,16 +256,6 @@ fun BookmarksScreenContent(
                 }
             }
 
-            PrimaryBottomBar(
-                currentScreen = com.shinjikai.dictionary.ui.Screen.Bookmarks,
-                onSearchClick = onSearchClick,
-                onHistoryClick = onHistoryClick,
-                onBookmarksClick = onBookmarksClick,
-                onSettingsClick = onSettingsClick,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-            )
         }
 
         uiState.pendingDeletionIds?.let { ids ->

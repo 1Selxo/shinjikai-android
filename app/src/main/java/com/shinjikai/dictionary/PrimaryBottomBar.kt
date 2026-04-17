@@ -45,7 +45,7 @@ fun PrimaryBottomBar(
 
     Surface(
         modifier = modifier
-            .fillMaxWidth()
+            .widthIn(max = 360.dp)
             .padding(horizontal = 20.dp, vertical = 4.dp)
             .height(64.dp),
         shape = RoundedCornerShape(26.dp),

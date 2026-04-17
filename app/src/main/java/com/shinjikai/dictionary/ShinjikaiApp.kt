@@ -13,6 +13,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -24,6 +26,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -86,6 +89,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import androidx.navigation.navDeepLink
 import androidx.navigation.navArgument
@@ -289,10 +293,10 @@ fun ShinjikaiApp(
                                     uriPattern = "https://shinjikai.app/search?${AppRoute.SEARCH_QUERY_ARG}={${AppRoute.SEARCH_QUERY_ARG}}"
                                 }
                             ),
-                            enterTransition = { searchEnterTransition() },
-                            exitTransition = { searchExitTransition() },
-                            popEnterTransition = { searchPopEnterTransition() },
-                            popExitTransition = { searchPopExitTransition() }
+                            enterTransition = { primaryEnterTransition() },
+                            exitTransition = { primaryExitTransition() },
+                            popEnterTransition = { primaryPopEnterTransition() },
+                            popExitTransition = { primaryPopExitTransition() }
                         ) { entry ->
                             val incomingQuery = entry.arguments?.getString(AppRoute.SEARCH_QUERY_ARG)?.trim().orEmpty()
                             LaunchedEffect(incomingQuery) {
@@ -308,15 +312,6 @@ fun ShinjikaiApp(
                                 viewModel = viewModel,
                                 uiState = viewModel.searchUiState,
                                 searchResults = viewModel.searchResults,
-                                onSearchClick = handleSearchTabClick,
-                                onHistoryClick = {
-                                    focusManager.clearFocus()
-                                    navController.navigateToPrimary(AppRoute.History)
-                                },
-                                onBookmarksClick = {
-                                    focusManager.clearFocus()
-                                    navController.navigateToPrimary(AppRoute.Bookmarks)
-                                },
                                 onSettingsClick = {
                                     focusManager.clearFocus()
                                     navController.navigateToPrimary(AppRoute.Settings)
@@ -328,38 +323,25 @@ fun ShinjikaiApp(
                             )
                         }
                         composable(AppRoute.History.route,
-                            enterTransition = { EnterTransition.None },
-                            exitTransition = { ExitTransition.None },
-                            popEnterTransition = { EnterTransition.None },
-                            popExitTransition = { ExitTransition.None }
+                            enterTransition = { primaryEnterTransition() },
+                            exitTransition = { primaryExitTransition() },
+                            popEnterTransition = { primaryPopEnterTransition() },
+                            popExitTransition = { primaryPopExitTransition() }
                         ) {
                             HistoryScreenContent(
                                 uiState = viewModel.searchUiState,
                                 viewModel = viewModel,
-                                onSearchClick = handleSearchTabClick,
                                 onOpenHistoryTerm = { historyTerm ->
                                     focusManager.clearFocus()
                                     navController.navigateToPrimary(AppRoute.Search, buildSearchRoute(historyTerm))
-                                },
-                                onHistoryClick = {
-                                    focusManager.clearFocus()
-                                    navController.navigateToPrimary(AppRoute.History)
-                                },
-                                onBookmarksClick = {
-                                    focusManager.clearFocus()
-                                    navController.navigateToPrimary(AppRoute.Bookmarks)
-                                },
-                                onSettingsClick = {
-                                    focusManager.clearFocus()
-                                    navController.navigateToPrimary(AppRoute.Settings)
                                 }
                             )
                         }
                         composable(AppRoute.Bookmarks.route,
-                            enterTransition = { EnterTransition.None },
-                            exitTransition = { ExitTransition.None },
-                            popEnterTransition = { EnterTransition.None },
-                            popExitTransition = { ExitTransition.None }
+                            enterTransition = { primaryEnterTransition() },
+                            exitTransition = { primaryExitTransition() },
+                            popEnterTransition = { primaryPopEnterTransition() },
+                            popExitTransition = { primaryPopExitTransition() }
                         ) {
                             BookmarksScreenContent(
                                 viewModel = viewModel,
@@ -373,30 +355,16 @@ fun ShinjikaiApp(
                                             source = DetailSource.Bookmark
                                         )
                                     )
-                                },
-                                onSearchClick = handleSearchTabClick,
-                                onHistoryClick = {
-                                    focusManager.clearFocus()
-                                    navController.navigateToPrimary(AppRoute.History)
-                                },
-                                onBookmarksClick = {
-                                    focusManager.clearFocus()
-                                    navController.navigateToPrimary(AppRoute.Bookmarks)
-                                },
-                                onSettingsClick = {
-                                    focusManager.clearFocus()
-                                    navController.navigateToPrimary(AppRoute.Settings)
                                 }
                             )
                         }
                         composable(AppRoute.Settings.route,
-                            enterTransition = { EnterTransition.None },
-                            exitTransition = { ExitTransition.None },
-                            popEnterTransition = { EnterTransition.None },
-                            popExitTransition = { ExitTransition.None }
+                            enterTransition = { primaryEnterTransition() },
+                            exitTransition = { primaryExitTransition() },
+                            popEnterTransition = { primaryPopEnterTransition() },
+                            popExitTransition = { primaryPopExitTransition() }
                         ) {
                             SettingsScreenContent(
-                                appVersionLabel = appVersionLabel,
                                 supportsDynamicColor = supportsDynamicColor,
                                 uiState = viewModel.settingsUiState,
                                 viewModel = viewModel,
@@ -407,19 +375,6 @@ fun ShinjikaiApp(
                                 onOpenAnkiExporterSettings = {
                                     focusManager.clearFocus()
                                     navController.navigate(AppRoute.AnkiExporterSettings.route)
-                                },
-                                onSearchClick = handleSearchTabClick,
-                                onHistoryClick = {
-                                    focusManager.clearFocus()
-                                    navController.navigateToPrimary(AppRoute.History)
-                                },
-                                onBookmarksClick = {
-                                    focusManager.clearFocus()
-                                    navController.navigateToPrimary(AppRoute.Bookmarks)
-                                },
-                                onSettingsClick = {
-                                    focusManager.clearFocus()
-                                    navController.navigateToPrimary(AppRoute.Settings)
                                 }
                             )
                         }
@@ -511,6 +466,46 @@ fun ShinjikaiApp(
                                             )
                                         }
                                     }
+                                }
+                            )
+                        }
+                    }
+
+                    if (currentScreen in setOf(Screen.Search, Screen.History, Screen.Bookmarks, Screen.Settings)) {
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            if (currentScreen == Screen.Settings) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${stringResource(R.string.settings_about_version)}: $appVersionLabel",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                                    )
+                                }
+                            }
+                            PrimaryBottomBar(
+                                currentScreen = currentScreen ?: Screen.Search,
+                                onSearchClick = handleSearchTabClick,
+                                onHistoryClick = {
+                                    focusManager.clearFocus()
+                                    navController.navigateToPrimary(AppRoute.History)
+                                },
+                                onBookmarksClick = {
+                                    focusManager.clearFocus()
+                                    navController.navigateToPrimary(AppRoute.Bookmarks)
+                                },
+                                onSettingsClick = {
+                                    focusManager.clearFocus()
+                                    navController.navigateToPrimary(AppRoute.Settings)
                                 }
                             )
                         }
@@ -916,17 +911,59 @@ private fun NavHostController.navigateToPrimary(route: AppRoute, targetRoute: St
     }
 }
 
-private fun AnimatedContentTransitionScope<*>.searchEnterTransition() =
-    fadeIn(animationSpec = tween(180))
+private fun primaryRouteIndex(screen: Screen?): Int = when (screen) {
+    Screen.Search -> 0
+    Screen.History -> 1
+    Screen.Bookmarks -> 2
+    Screen.Settings -> 3
+    else -> 0
+}
 
-private fun AnimatedContentTransitionScope<*>.searchExitTransition() =
-    fadeOut(animationSpec = tween(120))
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.primarySlideDirection(): AnimatedContentTransitionScope.SlideDirection {
+    val initialIndex = primaryRouteIndex(initialState.destination.route.toScreen())
+    val targetIndex = primaryRouteIndex(targetState.destination.route.toScreen())
+    return if (targetIndex >= initialIndex) {
+        AnimatedContentTransitionScope.SlideDirection.Start
+    } else {
+        AnimatedContentTransitionScope.SlideDirection.End
+    }
+}
 
-private fun AnimatedContentTransitionScope<*>.searchPopEnterTransition() =
-    fadeIn(animationSpec = tween(180))
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryEnterTransition() =
+    slideIntoContainer(
+        towards = primarySlideDirection(),
+        animationSpec = tween(280)
+    ) + fadeIn(animationSpec = tween(220)) + scaleIn(
+        initialScale = 0.96f,
+        animationSpec = tween(220)
+    )
 
-private fun AnimatedContentTransitionScope<*>.searchPopExitTransition() =
-    fadeOut(animationSpec = tween(120))
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryExitTransition() =
+    slideOutOfContainer(
+        towards = primarySlideDirection(),
+        animationSpec = tween(240)
+    ) + fadeOut(animationSpec = tween(180)) + scaleOut(
+        targetScale = 0.98f,
+        animationSpec = tween(180)
+    )
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryPopEnterTransition() =
+    slideIntoContainer(
+        towards = primarySlideDirection(),
+        animationSpec = tween(280)
+    ) + fadeIn(animationSpec = tween(220)) + scaleIn(
+        initialScale = 0.96f,
+        animationSpec = tween(220)
+    )
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryPopExitTransition() =
+    slideOutOfContainer(
+        towards = primarySlideDirection(),
+        animationSpec = tween(240)
+    ) + fadeOut(animationSpec = tween(180)) + scaleOut(
+        targetScale = 0.98f,
+        animationSpec = tween(180)
+    )
 
 private fun AnimatedContentTransitionScope<*>.detailEnterTransition() =
     slideIntoContainer(
