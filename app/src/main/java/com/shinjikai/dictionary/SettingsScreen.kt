@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -82,6 +84,7 @@ private data class OfflineImportStatusUi(
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun SettingsScreenContent(
+    appVersionLabel: String,
     supportsDynamicColor: Boolean,
     uiState: SettingsUiState,
     viewModel: ShinjikaiViewModel,
@@ -103,106 +106,119 @@ fun SettingsScreenContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp)
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 32.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    SettingsToggleRow(
-                        icon = Icons.Filled.DarkMode,
-                        label = stringResource(R.string.settings_dark_mode),
-                        checked = uiState.settings.darkMode,
-                        onCheckedChange = viewModel::setDarkMode
-                    )
-                    SettingsToggleRow(
-                        icon = Icons.Filled.Palette,
-                        label = stringResource(R.string.settings_dynamic_color),
-                        checked = uiState.settings.useDynamicColor && supportsDynamicColor,
-                        onCheckedChange = viewModel::setUseDynamicColor,
-                        enabled = supportsDynamicColor
-                    )
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        SettingsToggleRow(
+                            icon = Icons.Filled.DarkMode,
+                            label = stringResource(R.string.settings_dark_mode),
+                            checked = uiState.settings.darkMode,
+                            onCheckedChange = viewModel::setDarkMode
+                        )
+                        SettingsToggleRow(
+                            icon = Icons.Filled.Palette,
+                            label = stringResource(R.string.settings_dynamic_color),
+                            checked = uiState.settings.useDynamicColor && supportsDynamicColor,
+                            onCheckedChange = viewModel::setUseDynamicColor,
+                            enabled = supportsDynamicColor
+                        )
+                    }
                 }
-            }
 
-            LocalDictionarySummaryCard(
-                uiState = uiState,
-                onClick = onOpenLocalDictionary
-            )
+                LocalDictionarySummaryCard(
+                    uiState = uiState,
+                    onClick = onOpenLocalDictionary
+                )
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    SettingsSectionTitle(
-                        icon = Icons.Filled.TaskAlt,
-                        title = stringResource(R.string.settings_anki_section_title)
-                    )
-                    SettingsLinkRow(
-                        painterRes = R.drawable.ic_anki,
-                        title = stringResource(R.string.settings_anki_exporter_title),
-                        description = stringResource(R.string.settings_anki_exporter_description),
-                        contentDescription = stringResource(R.string.settings_anki_exporter_open),
-                        onClick = onOpenAnkiExporterSettings
-                    )
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        SettingsSectionTitle(
+                            icon = Icons.Filled.TaskAlt,
+                            title = stringResource(R.string.settings_anki_section_title)
+                        )
+                        SettingsLinkRow(
+                            painterRes = R.drawable.ic_anki,
+                            title = stringResource(R.string.settings_anki_exporter_title),
+                            description = stringResource(R.string.settings_anki_exporter_description),
+                            contentDescription = stringResource(R.string.settings_anki_exporter_open),
+                            onClick = onOpenAnkiExporterSettings
+                        )
+                    }
                 }
-            }
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    SettingsSectionTitle(
-                        icon = Icons.Filled.Info,
-                        title = stringResource(R.string.settings_about_title)
-                    )
-                    SettingsLinkRow(
-                        icon = Icons.Filled.Public,
-                        title = stringResource(R.string.settings_attribution_title),
-                        description = stringResource(R.string.settings_attribution_description),
-                        contentDescription = stringResource(R.string.settings_attribution_open),
-                        onClick = {
-                            context.startActivity(
-                                Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse("https://shinjikai.app")
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        SettingsSectionTitle(
+                            icon = Icons.Filled.Info,
+                            title = stringResource(R.string.settings_about_title)
+                        )
+                        SettingsLinkRow(
+                            icon = Icons.Filled.Public,
+                            title = stringResource(R.string.settings_attribution_title),
+                            description = stringResource(R.string.settings_attribution_description),
+                            contentDescription = stringResource(R.string.settings_attribution_open),
+                            onClick = {
+                                context.startActivity(
+                                    Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://shinjikai.app")
+                                    )
                                 )
-                            )
-                        }
-                    )
-                    SettingsLinkRow(
-                        icon = Icons.Filled.Code,
-                        title = stringResource(R.string.settings_github),
-                        description = stringResource(R.string.settings_about_source_description),
-                        contentDescription = stringResource(R.string.settings_open_github),
-                        onClick = {
-                            context.startActivity(
-                                Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse("https://github.com/obj44/shinjikai")
+                            }
+                        )
+                        SettingsLinkRow(
+                            icon = Icons.Filled.Code,
+                            title = stringResource(R.string.settings_github),
+                            description = stringResource(R.string.settings_about_source_description),
+                            contentDescription = stringResource(R.string.settings_open_github),
+                            onClick = {
+                                context.startActivity(
+                                    Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://github.com/obj44/shinjikai")
+                                    )
                                 )
-                            )
-                        }
+                            }
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "${stringResource(R.string.settings_about_version)}: $appVersionLabel",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
                     )
                 }
-            }
             }
         }
     }
@@ -415,12 +431,14 @@ fun AnkiExporterSettingsScreenContent(
                                             }
                                         }
                                     )
-                                }
-                            }
-                        }
-                    }
                 }
             }
+
+            Spacer(modifier = Modifier.height(128.dp))
+            }
+        }
+    }
+}
 
             OutlinedButton(
                 onClick = { onSelectDeck("Shinjikai") },

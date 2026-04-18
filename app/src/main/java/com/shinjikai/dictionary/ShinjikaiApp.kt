@@ -13,8 +13,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -365,6 +363,7 @@ fun ShinjikaiApp(
                             popExitTransition = { primaryPopExitTransition() }
                         ) {
                             SettingsScreenContent(
+                                appVersionLabel = appVersionLabel,
                                 supportsDynamicColor = supportsDynamicColor,
                                 uiState = viewModel.settingsUiState,
                                 viewModel = viewModel,
@@ -472,26 +471,12 @@ fun ShinjikaiApp(
                     }
 
                     if (currentScreen in setOf(Screen.Search, Screen.History, Screen.Bookmarks, Screen.Settings)) {
-                        Column(
+                        Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .navigationBarsPadding(),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            contentAlignment = Alignment.BottomCenter
                         ) {
-                            if (currentScreen == Screen.Settings) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "${stringResource(R.string.settings_about_version)}: $appVersionLabel",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
-                                    )
-                                }
-                            }
                             PrimaryBottomBar(
                                 currentScreen = currentScreen ?: Screen.Search,
                                 onSearchClick = handleSearchTabClick,
@@ -932,38 +917,30 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.primarySlideDirect
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryEnterTransition() =
     slideIntoContainer(
         towards = primarySlideDirection(),
-        animationSpec = tween(280)
-    ) + fadeIn(animationSpec = tween(220)) + scaleIn(
-        initialScale = 0.96f,
-        animationSpec = tween(220)
-    )
+        animationSpec = tween(240),
+        initialOffset = { fullSize -> fullSize / 16 }
+    ) + fadeIn(animationSpec = tween(210, delayMillis = 40))
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryExitTransition() =
     slideOutOfContainer(
         towards = primarySlideDirection(),
-        animationSpec = tween(240)
-    ) + fadeOut(animationSpec = tween(180)) + scaleOut(
-        targetScale = 0.98f,
-        animationSpec = tween(180)
-    )
+        animationSpec = tween(200),
+        targetOffset = { fullSize -> -fullSize / 20 }
+    ) + fadeOut(animationSpec = tween(120))
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryPopEnterTransition() =
     slideIntoContainer(
         towards = primarySlideDirection(),
-        animationSpec = tween(280)
-    ) + fadeIn(animationSpec = tween(220)) + scaleIn(
-        initialScale = 0.96f,
-        animationSpec = tween(220)
-    )
+        animationSpec = tween(240),
+        initialOffset = { fullSize -> fullSize / 16 }
+    ) + fadeIn(animationSpec = tween(210, delayMillis = 40))
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryPopExitTransition() =
     slideOutOfContainer(
         towards = primarySlideDirection(),
-        animationSpec = tween(240)
-    ) + fadeOut(animationSpec = tween(180)) + scaleOut(
-        targetScale = 0.98f,
-        animationSpec = tween(180)
-    )
+        animationSpec = tween(200),
+        targetOffset = { fullSize -> -fullSize / 20 }
+    ) + fadeOut(animationSpec = tween(120))
 
 private fun AnimatedContentTransitionScope<*>.detailEnterTransition() =
     slideIntoContainer(

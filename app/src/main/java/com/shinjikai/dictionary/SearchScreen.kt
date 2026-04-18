@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -451,10 +453,10 @@ private fun SearchTopDock(
         }
     }
 
-    Column(
-        modifier = modifier.padding(vertical = if (isImeVisible) 2.dp else 0.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
+        Column(
+            modifier = modifier.padding(vertical = if (isImeVisible) 2.dp else 0.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
         activeCategoryName?.let {
             CategorySearchBanner(
                 label = it,
@@ -462,67 +464,84 @@ private fun SearchTopDock(
             )
         }
 
-        if (activeCategoryName == null) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                tonalElevation = 0.dp
-            ) {
-                SearchModeTabs(
-                    useOfflineMode = useOfflineMode,
-                    onModeSelected = onModeSelected
-                )
-            }
-        }
-
         Surface(
             shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp,
-            shadowElevation = 4.dp
+            tonalElevation = 1.dp,
+            shadowElevation = 2.dp
         ) {
-            OutlinedTextField(
-                value = term,
-                onValueChange = onTermChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester)
-                    .onGloballyPositioned { onFieldReady() },
-                singleLine = true,
-                placeholder = {
-                    Text(
-                        text = stringResource(R.string.search_hint),
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                OutlinedTextField(
+                    value = term,
+                    onValueChange = onTermChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester)
+                        .onGloballyPositioned { onFieldReady() },
+                    singleLine = true,
+                    placeholder = {
+                        Text(
+                            text = stringResource(R.string.search_hint),
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomStart = 0.dp, bottomEnd = 0.dp),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { onRunSearch() }),
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = stringResource(R.string.nav_search)
+                        )
+                    },
+                    trailingIcon = {
+                        if (term.isNotEmpty()) {
+                            IconButton(onClick = onClearTerm) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.nav_clear)
+                                )
+                            }
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
                     )
-                },
-                shape = RoundedCornerShape(22.dp),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { onRunSearch() }),
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = stringResource(R.string.nav_search)
+                )
+
+                if (activeCategoryName == null) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)
                     )
-                },
-                trailingIcon = {
-                    if (term.isNotEmpty()) {
-                        IconButton(onClick = onClearTerm) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = stringResource(R.string.nav_clear)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            modifier = Modifier.widthIn(min = 210.dp, max = 250.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
+                            tonalElevation = 0.dp,
+                            shadowElevation = 0.dp
+                        ) {
+                            SearchModeTabs(
+                                useOfflineMode = useOfflineMode,
+                                onModeSelected = onModeSelected
                             )
                         }
                     }
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.10f),
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                )
-            )
+                }
+            }
         }
     }
 }
@@ -639,20 +658,21 @@ private fun SearchModeTabs(
         stringResource(R.string.mode_offline) to true,
         stringResource(R.string.mode_online) to false
     )
-    val selectedBackground = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-    val unselectedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f)
+    val selectedBackground = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+    val unselectedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
     val selectedColor = MaterialTheme.colorScheme.primary
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
+        shape = RoundedCornerShape(18.dp),
+        color = Color.Transparent
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 3.dp, vertical = 3.dp)
-                .height(42.dp)
+                .padding(horizontal = 4.dp, vertical = 4.dp)
+                .height(40.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             options.forEach { (label, isOfflineOption) ->
                 val selected = useOfflineMode == isOfflineOption
@@ -675,12 +695,11 @@ private fun SearchModeTabs(
                 Surface(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 2.dp)
                         .fillMaxSize(),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = containerColor.value,
-                    tonalElevation = if (selected) 1.dp else 0.dp,
-                    shadowElevation = if (selected) 1.dp else 0.dp,
+                    tonalElevation = if (selected) 0.5.dp else 0.dp,
+                    shadowElevation = 0.dp,
                     onClick = { onModeSelected(isOfflineOption) }
                 ) {
                     Box(
@@ -689,7 +708,7 @@ private fun SearchModeTabs(
                     ) {
                         Text(
                             text = label,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = if (selected) selectedColor else unselectedColor,
                             modifier = Modifier.scale(textScale.value)

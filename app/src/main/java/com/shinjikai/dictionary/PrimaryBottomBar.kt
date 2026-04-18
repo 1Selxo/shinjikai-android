@@ -45,19 +45,19 @@ fun PrimaryBottomBar(
 
     Surface(
         modifier = modifier
-            .widthIn(max = 360.dp)
-            .padding(horizontal = 20.dp, vertical = 4.dp)
-            .height(64.dp),
-        shape = RoundedCornerShape(26.dp),
+            .widthIn(max = 320.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .height(56.dp),
+        shape = RoundedCornerShape(22.dp),
         color = barColor,
         tonalElevation = 2.dp,
-        shadowElevation = 7.dp
+        shadowElevation = 6.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                .padding(horizontal = 6.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically
         ) {
             NavPillItem(
@@ -65,7 +65,7 @@ fun PrimaryBottomBar(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = null,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 },
                 selected = currentScreen == Screen.Search,
@@ -79,7 +79,7 @@ fun PrimaryBottomBar(
                     Icon(
                         imageVector = Icons.Default.History,
                         contentDescription = null,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 },
                 selected = currentScreen == Screen.History,
@@ -93,7 +93,7 @@ fun PrimaryBottomBar(
                     Icon(
                         imageVector = Icons.Default.Bookmark,
                         contentDescription = null,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 },
                 selected = currentScreen == Screen.Bookmarks,
@@ -107,7 +107,7 @@ fun PrimaryBottomBar(
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = null,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 },
                 selected = currentScreen == Screen.Settings,
@@ -144,14 +144,14 @@ private fun RowScope.NavPillItem(
         onClick = onClick,
         modifier = Modifier
             .weight(1f)
-            .height(48.dp)
-            .widthIn(min = 48.dp),
-        shape = RoundedCornerShape(18.dp),
+            .height(42.dp)
+            .widthIn(min = 42.dp),
+        shape = RoundedCornerShape(16.dp),
         color = containerColor.value
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically
         ) {
             CompositionLocalProvider(LocalContentColor provides contentColor.value) {
