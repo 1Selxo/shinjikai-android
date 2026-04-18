@@ -78,6 +78,21 @@ class LocalYomitanSourceDeinflectionTest {
         assertTrue(dao.ftsQueries.none { it.contains("行*") && !it.contains("行く*") })
     }
 
+    @Test
+    fun `offline search splits romaji sentence queries after transliteration`() = runTest {
+        val dao = FakeYomitanDao().apply {
+            ftsResults = listOf(
+                term(id = 50, expression = "魚", reading = "さかな", glossary = "fish"),
+                term(id = 51, expression = "食べる", reading = "たべる", glossary = "to eat")
+            )
+        }
+
+        val result = LocalYomitanSource(dao).searchWords(term = "sakanagatabetai", page = 0).getOrThrow()
+
+        assertEquals(setOf(50, 51), result.items.map { it.id }.toSet())
+        assertTrue(dao.ftsQueries.isNotEmpty())
+    }
+
     private class FakeYomitanDao : YomitanDao {
         var ftsResults: List<YomitanTermEntity> = emptyList()
         val ftsQueries = mutableListOf<String>()

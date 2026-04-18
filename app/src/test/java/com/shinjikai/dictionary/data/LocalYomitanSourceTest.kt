@@ -43,12 +43,27 @@ class LocalYomitanSourceTest {
         assertTrue(result.items.none { it.id == 3 })
     }
 
+    @Test
+    fun `offline search transliterates romaji queries before matching`() = runTest {
+        val dao = FakeYomitanDao().apply {
+            ftsResults = listOf(
+                term(id = 7, expression = "食べる", reading = "たべる", glossary = "to eat")
+            )
+        }
+
+        val result = LocalYomitanSource(dao).searchWords(term = "taberu", page = 0).getOrThrow()
+
+        assertEquals(listOf(7), result.items.map { it.id })
+        assertTrue(dao.ftsQueries.any { it.contains("たべる*") })
+    }
+
     private class FakeYomitanDao : YomitanDao {
         var ftsResults: List<YomitanTermEntity> = emptyList()
         var glossaryFtsResults: List<YomitanTermEntity> = emptyList()
         var directSearchResults: List<YomitanTermEntity> = emptyList()
         var lastFtsQuery: String? = null
         var lastGlossaryFtsQuery: String? = null
+        val ftsQueries = mutableListOf<String>()
 
         override suspend fun search(term: String, prefix: String, limit: Int): List<YomitanTermEntity> = directSearchResults
 
@@ -57,6 +72,7 @@ class LocalYomitanSourceTest {
 
         override suspend fun searchFts(matchQuery: String, limit: Int): List<YomitanTermEntity> {
             lastFtsQuery = matchQuery
+            ftsQueries += matchQuery
             return ftsResults.take(limit)
         }
 

@@ -472,10 +472,7 @@ fun ShinjikaiApp(
 
                     if (currentScreen in setOf(Screen.Search, Screen.History, Screen.Bookmarks, Screen.Settings)) {
                         Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .navigationBarsPadding(),
-                            contentAlignment = Alignment.BottomCenter
+                            modifier = Modifier.align(Alignment.BottomCenter)
                         ) {
                             PrimaryBottomBar(
                                 currentScreen = currentScreen ?: Screen.Search,
@@ -506,7 +503,6 @@ fun ShinjikaiApp(
                         )
                     }
                 }
-
             }
         }
     }

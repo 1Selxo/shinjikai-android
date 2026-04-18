@@ -1,31 +1,29 @@
 package com.shinjikai.dictionary
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemColors
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.shinjikai.dictionary.ui.Screen
 
@@ -38,125 +36,114 @@ fun PrimaryBottomBar(
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val barColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f)
-    val activePillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-    val activeContentColor = MaterialTheme.colorScheme.primary
-    val inactiveColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.70f)
+    val itemColors = NavigationBarItemDefaults.colors(
+        selectedIconColor = MaterialTheme.colorScheme.primary,
+        selectedTextColor = MaterialTheme.colorScheme.primary,
+        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
+    )
 
     Surface(
-        modifier = modifier
-            .widthIn(max = 320.dp)
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .height(56.dp),
-        shape = RoundedCornerShape(22.dp),
-        color = barColor,
-        tonalElevation = 2.dp,
-        shadowElevation = 6.dp
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+        shadowElevation = 6.dp,
+        tonalElevation = 0.dp
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            NavPillItem(
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp)
-                    )
-                },
-                selected = currentScreen == Screen.Search,
-                selectedContainerColor = activePillColor,
-                selectedContentColor = activeContentColor,
-                unselectedContentColor = inactiveColor,
-                onClick = onSearchClick
+        Column(modifier = Modifier.fillMaxWidth()) {
+            HorizontalDivider(
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
             )
-            NavPillItem(
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.History,
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp)
-                    )
-                },
-                selected = currentScreen == Screen.History,
-                selectedContainerColor = activePillColor,
-                selectedContentColor = activeContentColor,
-                unselectedContentColor = inactiveColor,
-                onClick = onHistoryClick
-            )
-            NavPillItem(
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.Bookmark,
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp)
-                    )
-                },
-                selected = currentScreen == Screen.Bookmarks,
-                selectedContainerColor = activePillColor,
-                selectedContentColor = activeContentColor,
-                unselectedContentColor = inactiveColor,
-                onClick = onBookmarksClick
-            )
-            NavPillItem(
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp)
-                    )
-                },
-                selected = currentScreen == Screen.Settings,
-                selectedContainerColor = activePillColor,
-                selectedContentColor = activeContentColor,
-                unselectedContentColor = inactiveColor,
-                onClick = onSettingsClick
-            )
+            NavigationBar(
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                tonalElevation = 0.dp,
+                windowInsets = NavigationBarDefaults.windowInsets
+            ) {
+                BottomBarItem(
+                    selected = currentScreen == Screen.Search,
+                    onClick = onSearchClick,
+                    icon = { modifier ->
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = stringResource(R.string.nav_search),
+                            modifier = modifier
+                        )
+                    },
+                    label = stringResource(R.string.nav_search),
+                    colors = itemColors
+                )
+                BottomBarItem(
+                    selected = currentScreen == Screen.History,
+                    onClick = onHistoryClick,
+                    icon = { modifier ->
+                        Icon(
+                            Icons.Default.History,
+                            contentDescription = stringResource(R.string.history_title),
+                            modifier = modifier
+                        )
+                    },
+                    label = stringResource(R.string.history_title),
+                    colors = itemColors
+                )
+                BottomBarItem(
+                    selected = currentScreen == Screen.Bookmarks,
+                    onClick = onBookmarksClick,
+                    icon = { modifier ->
+                        Icon(
+                            Icons.Default.Bookmark,
+                            contentDescription = stringResource(R.string.nav_bookmarks),
+                            modifier = modifier
+                        )
+                    },
+                    label = stringResource(R.string.nav_bookmarks),
+                    colors = itemColors
+                )
+                BottomBarItem(
+                    selected = currentScreen == Screen.Settings,
+                    onClick = onSettingsClick,
+                    icon = { modifier ->
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.nav_settings),
+                            modifier = modifier
+                        )
+                    },
+                    label = stringResource(R.string.nav_settings),
+                    colors = itemColors
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun RowScope.NavPillItem(
-    icon: @Composable () -> Unit,
+private fun RowScope.BottomBarItem(
     selected: Boolean,
-    selectedContainerColor: Color,
-    selectedContentColor: Color,
-    unselectedContentColor: Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    icon: @Composable (Modifier) -> Unit,
+    label: String,
+    colors: NavigationBarItemColors
 ) {
-    val containerColor = animateColorAsState(
-        targetValue = if (selected) selectedContainerColor else Color.Transparent,
-        animationSpec = spring(stiffness = 420f),
-        label = "navPillContainer"
-    )
-    val contentColor = animateColorAsState(
-        targetValue = if (selected) selectedContentColor else unselectedContentColor,
-        animationSpec = spring(stiffness = 420f),
-        label = "navPillContent"
+    val iconScale = animateFloatAsState(
+        targetValue = if (selected) 1.08f else 1f,
+        animationSpec = spring(stiffness = 450f, dampingRatio = 0.88f),
+        label = "bottomBarIconScale"
     )
 
-    Surface(
+    NavigationBarItem(
+        selected = selected,
         onClick = onClick,
-        modifier = Modifier
-            .weight(1f)
-            .height(42.dp)
-            .widthIn(min = 42.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = containerColor.value
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CompositionLocalProvider(LocalContentColor provides contentColor.value) {
-                icon()
-            }
-        }
-    }
+        icon = { icon(Modifier.scale(iconScale.value)) },
+        label = {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall
+            )
+        },
+        alwaysShowLabel = true,
+        colors = colors
+    )
 }

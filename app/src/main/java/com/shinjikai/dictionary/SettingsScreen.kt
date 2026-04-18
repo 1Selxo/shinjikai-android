@@ -149,10 +149,6 @@ fun SettingsScreenContent(
                         modifier = Modifier.padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        SettingsSectionTitle(
-                            icon = Icons.Filled.TaskAlt,
-                            title = stringResource(R.string.settings_anki_section_title)
-                        )
                         SettingsLinkRow(
                             painterRes = R.drawable.ic_anki,
                             title = stringResource(R.string.settings_anki_exporter_title),

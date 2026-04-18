@@ -25,9 +25,22 @@ class LocalYomitanSource(
 
         return runCatching {
             val isArabic = isArabicQuery(query)
-            val japaneseSearchSegments = if (!isArabic) extractSearchSegments(query) else emptyList()
-            val japaneseSearchCandidates = if (!isArabic) buildJapaneseSearchCandidates(query) else emptyList()
-            val ftsQueries = if (!isArabic) buildGenericFtsQueries(query) else emptyList()
+            val normalizedQueries = if (!isArabic) buildNormalizedJapaneseQueries(query) else emptyList()
+            val japaneseSearchSegments = if (!isArabic) {
+                normalizedQueries.flatMap(::extractSearchSegments).distinct()
+            } else {
+                emptyList()
+            }
+            val japaneseSearchCandidates = if (!isArabic) {
+                normalizedQueries.flatMap(::buildJapaneseSearchCandidates).distinct()
+            } else {
+                emptyList()
+            }
+            val ftsQueries = if (!isArabic) {
+                normalizedQueries.flatMap(::buildGenericFtsQueries).distinct()
+            } else {
+                emptyList()
+            }
 
             val allRows: List<YomitanTermEntity>
             val pagedRowsDirect: List<YomitanTermEntity>?
@@ -273,6 +286,15 @@ class LocalYomitanSource(
         return extractSearchSegments(rawQuery)
             .mapNotNull(::buildSegmentFtsQuery)
             .distinct()
+    }
+
+    private fun buildNormalizedJapaneseQueries(rawQuery: String): List<String> {
+        return buildList {
+            add(rawQuery)
+            RomajiConverter.toHiraganaIfRomaji(rawQuery)
+                ?.takeIf { it != rawQuery }
+                ?.let(::add)
+        }.distinct()
     }
 
     private fun buildJapaneseSearchCandidates(rawQuery: String): List<String> {
