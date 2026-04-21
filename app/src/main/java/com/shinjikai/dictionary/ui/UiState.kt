@@ -2,6 +2,7 @@ package com.shinjikai.dictionary.ui
 
 import com.shinjikai.dictionary.data.AppSettings
 import com.shinjikai.dictionary.data.BookmarkItem
+import com.shinjikai.dictionary.data.RecentSearchEntry
 import com.shinjikai.dictionary.data.SearchItem
 import com.shinjikai.dictionary.data.WordDetailsResponse
 
@@ -10,7 +11,7 @@ data class SearchUiState(
     val activeCategoryId: Int? = null,
     val activeCategoryName: String? = null,
     val resultMode: ResultMode = ResultMode.None,
-    val recentSearches: List<String> = emptyList(),
+    val recentSearches: List<RecentSearchEntry> = emptyList(),
     val offlinePreviewItems: List<SearchItem> = emptyList()
 )
 

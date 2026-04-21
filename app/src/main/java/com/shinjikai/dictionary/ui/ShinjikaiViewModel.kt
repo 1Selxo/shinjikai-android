@@ -27,6 +27,7 @@ import com.shinjikai.dictionary.data.RecentSearchStore
 import com.shinjikai.dictionary.data.RelatedWordItem
 import com.shinjikai.dictionary.data.RemoteDictionarySource
 import com.shinjikai.dictionary.data.RawShinjikaiImporter
+import com.shinjikai.dictionary.data.RecentSearchEntry
 import com.shinjikai.dictionary.data.SearchItem
 import com.shinjikai.dictionary.data.SearchPagingSource
 import com.shinjikai.dictionary.data.SearchRequestSpec
@@ -146,7 +147,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     var selectedBookmarkIds by mutableStateOf<Set<Int>>(emptySet())
     var pendingBookmarkDeletionIds by mutableStateOf<Set<Int>?>(null)
 
-    val recentSearches = mutableStateListOf<String>().apply {
+    val recentSearches = mutableStateListOf<RecentSearchEntry>().apply {
         addAll(recentSearchStore.readCached())
     }
     val offlinePreviewItems = mutableStateListOf<SearchItem>()
@@ -787,8 +788,14 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     private fun rememberRecentSearch(term: String) {
         val normalized = term.trim()
         if (normalized.isBlank()) return
-        recentSearches.removeAll { it.equals(normalized, ignoreCase = true) }
-        recentSearches.add(0, normalized)
+        recentSearches.removeAll { it.term.equals(normalized, ignoreCase = true) }
+        recentSearches.add(
+            0,
+            RecentSearchEntry(
+                term = normalized,
+                searchedAtEpochMs = System.currentTimeMillis()
+            )
+        )
         while (recentSearches.size > MAX_RECENT_SEARCHES) {
             recentSearches.removeAt(recentSearches.lastIndex)
         }
@@ -799,7 +806,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     fun removeRecentSearch(term: String) {
         val normalized = term.trim()
         if (normalized.isBlank()) return
-        if (recentSearches.removeAll { it.equals(normalized, ignoreCase = true) }) {
+        if (recentSearches.removeAll { it.term.equals(normalized, ignoreCase = true) }) {
             val snapshot = recentSearches.toList()
             viewModelScope.launch { recentSearchStore.save(snapshot) }
         }

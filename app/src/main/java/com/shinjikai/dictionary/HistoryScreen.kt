@@ -41,8 +41,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.shinjikai.dictionary.data.RecentSearchEntry
 import com.shinjikai.dictionary.ui.SearchUiState
 import com.shinjikai.dictionary.ui.ShinjikaiViewModel
+import java.text.DateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -132,7 +136,7 @@ fun HistoryScreenContent(
                         }
                     }
 
-                    items(uiState.recentSearches, key = { it }) { historyTerm ->
+                    items(uiState.recentSearches, key = { it.term.lowercase(Locale.ROOT) }) { historyEntry ->
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(18.dp),
@@ -143,7 +147,7 @@ fun HistoryScreenContent(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        onOpenHistoryTerm(historyTerm)
+                                        onOpenHistoryTerm(historyEntry.term)
                                     }
                                     .padding(horizontal = 14.dp, vertical = 12.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -165,14 +169,27 @@ fun HistoryScreenContent(
                                         )
                                     }
                                 }
-                                Text(
-                                    text = historyTerm,
-                                    style = MaterialTheme.typography.bodyLarge,
+                                Column(
                                     modifier = Modifier.weight(1f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                IconButton(onClick = { pendingDeleteTerm = historyTerm }) {
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = historyEntry.term,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    formatHistoryDate(historyEntry)?.let { formattedDate ->
+                                        Text(
+                                            text = formattedDate,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                IconButton(onClick = { pendingDeleteTerm = historyEntry.term }) {
                                     Icon(
                                         imageVector = Icons.Default.DeleteOutline,
                                         contentDescription = stringResource(R.string.search_remove_history),
@@ -234,4 +251,10 @@ fun HistoryScreenContent(
             }
         )
     }
+}
+
+private fun formatHistoryDate(historyEntry: RecentSearchEntry): String? {
+    val searchedAtEpochMs = historyEntry.searchedAtEpochMs ?: return null
+    val formatter = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+    return formatter.format(Date(searchedAtEpochMs))
 }
