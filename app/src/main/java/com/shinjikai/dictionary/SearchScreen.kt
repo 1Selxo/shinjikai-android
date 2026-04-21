@@ -173,29 +173,36 @@ fun SearchScreenContent(
                     .padding(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                SearchTopDock(
-                    term = uiState.term,
-                    useOfflineMode = useOfflineMode,
-                    activeCategoryName = uiState.activeCategoryName,
-                    searchFocusNonce = searchFocusNonce,
-                    onTermChange = { viewModel.term = it },
-                    onRunSearch = {
-                        focusManager.clearFocus()
-                        viewModel.runSearch()
-                    },
-                    onClearTerm = { viewModel.runSearchForTerm("") },
-                    onClearCategory = { viewModel.clearCategorySearch() },
-                    onModeSelected = { selectedOffline ->
-                        if (selectedOffline && !hasOfflineDictionary) {
-                            showOfflineDownloadPrompt = true
-                        } else if (selectedOffline != useOfflineMode) {
-                            viewModel.setUseOfflineMode(selectedOffline)
-                        }
-                    },
-                    focusRequester = searchFocusRequester,
-                    onFieldReady = { isSearchFieldReady = true },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (uiState.activeCategoryName == null) {
+                    SearchTopDock(
+                        term = uiState.term,
+                        useOfflineMode = useOfflineMode,
+                        activeCategoryName = null,
+                        searchFocusNonce = searchFocusNonce,
+                        onTermChange = { viewModel.term = it },
+                        onRunSearch = {
+                            focusManager.clearFocus()
+                            viewModel.runSearch()
+                        },
+                        onClearTerm = { viewModel.runSearchForTerm("") },
+                        onClearCategory = { viewModel.clearCategorySearch() },
+                        onModeSelected = { selectedOffline ->
+                            if (selectedOffline && !hasOfflineDictionary) {
+                                showOfflineDownloadPrompt = true
+                            } else if (selectedOffline != useOfflineMode) {
+                                viewModel.setUseOfflineMode(selectedOffline)
+                            }
+                        },
+                        focusRequester = searchFocusRequester,
+                        onFieldReady = { isSearchFieldReady = true },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    CategorySearchBanner(
+                        label = uiState.activeCategoryName,
+                        onClear = { viewModel.clearCategorySearch() }
+                    )
+                }
 
                 if (isRefreshing) {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
