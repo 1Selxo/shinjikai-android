@@ -168,10 +168,6 @@ fun SettingsScreenContent(
                         modifier = Modifier.padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        SettingsSectionTitle(
-                            icon = Icons.Filled.Info,
-                            title = stringResource(R.string.settings_about_title)
-                        )
                         SettingsLinkRow(
                             icon = Icons.Filled.Public,
                             title = stringResource(R.string.settings_attribution_title),
@@ -526,7 +522,7 @@ private fun LocalDictionarySummaryCard(
         uiState.offlineImportError ->
             uiState.offlineImportStatus ?: stringResource(R.string.offline_import_failure)
         hasOfflineDictionary ->
-            stringResource(R.string.settings_local_count, uiState.offlineTermCount)
+            "افتح هذه الصفحة لإدارة القاموس المحلي والاستيراد."
         else ->
             "افتح هذه الصفحة لتثبيت القاموس المحلي وإدارة الاستيراد."
     }
@@ -548,22 +544,15 @@ private fun LocalDictionarySummaryCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.settings_local_dictionary),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatusBadge(
-                        label = statusUi.label,
-                        color = statusUi.color
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.settings_local_dictionary),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                StatusBadge(
+                    label = statusUi.label,
+                    color = statusUi.color
+                )
                 Text(
                     text = summary,
                     style = MaterialTheme.typography.bodySmall,
@@ -975,24 +964,6 @@ private fun SettingsToggleRow(
             checked = checked,
             onCheckedChange = onCheckedChange,
             enabled = enabled
-        )
-    }
-}
-
-@Composable
-private fun SettingsSectionTitle(
-    icon: ImageVector,
-    title: String
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        SettingsLeadingIcon(icon = icon)
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
         )
     }
 }
