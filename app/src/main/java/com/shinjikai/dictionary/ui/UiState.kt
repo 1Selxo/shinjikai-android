@@ -12,7 +12,12 @@ data class SearchUiState(
     val activeCategoryName: String? = null,
     val resultMode: ResultMode = ResultMode.None,
     val recentSearches: List<RecentSearchEntry> = emptyList(),
-    val offlinePreviewItems: List<SearchItem> = emptyList()
+    val offlinePreviewItems: List<SearchItem> = emptyList(),
+    val isImportingOfflineData: Boolean = false,
+    val offlineImportError: Boolean = false,
+    val offlineImportStatus: String? = null,
+    val offlineImportPhase: String? = null,
+    val offlineTermCount: Int = 0
 )
 
 data class DetailUiState(

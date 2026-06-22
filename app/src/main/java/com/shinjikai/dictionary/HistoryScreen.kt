@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -62,7 +61,8 @@ fun HistoryScreenContent(
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.history_title)) }
+                title = { Text(stringResource(R.string.history_title)) },
+                colors = shinjikaiTopAppBarColors()
             )
         }
     ) { padding ->
@@ -92,12 +92,9 @@ fun HistoryScreenContent(
                 ) {
                     item(key = "history-header") {
                         Surface(
-                            shape = RoundedCornerShape(22.dp),
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                Color.White.copy(alpha = 0.14f)
-                            )
+                            shape = ShinjikaiUi.CardShape,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                            border = ShinjikaiUi.cardBorder()
                         ) {
                             Row(
                                 modifier = Modifier
@@ -139,9 +136,10 @@ fun HistoryScreenContent(
                     items(uiState.recentSearches, key = { it.term.lowercase(Locale.ROOT) }) { historyEntry ->
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(18.dp),
+                            shape = ShinjikaiUi.CardShape,
                             color = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 1.dp
+                            border = ShinjikaiUi.cardBorder(),
+                            tonalElevation = 0.dp
                         ) {
                             Row(
                                 modifier = Modifier
@@ -155,7 +153,7 @@ fun HistoryScreenContent(
                             ) {
                                 Surface(
                                     shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                    color = ShinjikaiUi.panelColor(alpha = 0.42f)
                                 ) {
                                     Box(
                                         modifier = Modifier.padding(8.dp),

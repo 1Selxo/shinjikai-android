@@ -101,6 +101,15 @@ interface YomitanDao {
     @Query("SELECT * FROM yomitan_terms")
     suspend fun loadAllTerms(): List<YomitanTermEntity>
 
+    @Query(
+        """
+        SELECT * FROM yomitan_terms
+        ORDER BY reading COLLATE NOCASE ASC, expression COLLATE NOCASE ASC, id ASC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    suspend fun browseTermsPaged(limit: Int, offset: Int): List<YomitanTermEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertCategoryRefs(items: List<YomitanTermCategoryEntity>)
 

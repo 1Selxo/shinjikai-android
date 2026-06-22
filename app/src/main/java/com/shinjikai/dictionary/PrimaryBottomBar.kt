@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
@@ -31,6 +32,7 @@ import com.shinjikai.dictionary.ui.Screen
 fun PrimaryBottomBar(
     currentScreen: Screen,
     onSearchClick: () -> Unit,
+    onBrowseClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onBookmarksClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -39,25 +41,25 @@ fun PrimaryBottomBar(
     val itemColors = NavigationBarItemDefaults.colors(
         selectedIconColor = MaterialTheme.colorScheme.primary,
         selectedTextColor = MaterialTheme.colorScheme.primary,
-        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
         unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
         unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
     )
 
     Surface(
         modifier = modifier,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+        color = MaterialTheme.colorScheme.background,
         shadowElevation = 6.dp,
         tonalElevation = 0.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             HorizontalDivider(
                 thickness = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.34f)
             )
             NavigationBar(
                 modifier = Modifier.fillMaxWidth(),
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+                containerColor = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 tonalElevation = 0.dp,
                 windowInsets = NavigationBarDefaults.windowInsets
@@ -73,6 +75,19 @@ fun PrimaryBottomBar(
                         )
                     },
                     label = stringResource(R.string.nav_search),
+                    colors = itemColors
+                )
+                BottomBarItem(
+                    selected = currentScreen == Screen.Browse,
+                    onClick = onBrowseClick,
+                    icon = { modifier ->
+                        Icon(
+                            Icons.AutoMirrored.Filled.MenuBook,
+                            contentDescription = stringResource(R.string.nav_browse),
+                            modifier = modifier
+                        )
+                    },
+                    label = stringResource(R.string.nav_browse),
                     colors = itemColors
                 )
                 BottomBarItem(

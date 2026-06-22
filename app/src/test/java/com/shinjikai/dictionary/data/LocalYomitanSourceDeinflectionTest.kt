@@ -93,6 +93,23 @@ class LocalYomitanSourceDeinflectionTest {
         assertTrue(dao.ftsQueries.isNotEmpty())
     }
 
+    @Test
+    fun `deinflector follows yomitan japanese transform chains`() {
+        val cases = mapOf(
+            "食べさせられなかった" to "食べる",
+            "愛しくありませんでした" to "愛しい",
+            "読んでいる" to "読む",
+            "いらっしゃいます" to "いらっしゃる",
+            "行かなかった" to "行く"
+        )
+
+        for ((inflected, dictionaryForm) in cases) {
+            val candidates = JapaneseDeinflector.generateCandidates(inflected)
+
+            assertTrue("$inflected should deinflect to $dictionaryForm", candidates.contains(dictionaryForm))
+        }
+    }
+
     private class FakeYomitanDao : YomitanDao {
         var ftsResults: List<YomitanTermEntity> = emptyList()
         val ftsQueries = mutableListOf<String>()
@@ -115,6 +132,8 @@ class LocalYomitanSourceDeinflectionTest {
         override suspend fun getById(id: Int): YomitanTermEntity? = null
 
         override suspend fun loadAllTerms(): List<YomitanTermEntity> = emptyList()
+
+        override suspend fun browseTermsPaged(limit: Int, offset: Int): List<YomitanTermEntity> = emptyList()
 
         override suspend fun upsertCategoryRefs(items: List<YomitanTermCategoryEntity>) = Unit
 

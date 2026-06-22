@@ -23,12 +23,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -153,7 +152,7 @@ fun DetailScreenBody(
         val definitionContent = formatDefinition(
             meanings = detailState.details?.word?.meanings,
             notePrefix = notePrefix,
-            enableGlossaryLinks = !useOfflineMode
+            enableGlossaryLinks = true
         ).takeIf { it.text.isNotBlank() }
             ?: run {
                 if (useOfflineMode) {
@@ -239,10 +238,8 @@ fun DetailScreenBody(
                 title = stringResource(R.string.detail_definitions_title),
                 content = definitionContent,
                 onGlossaryReferenceClick = { referenceId ->
-                    if (!useOfflineMode) {
-                        focusManager.clearFocus()
-                        onOpenGlossaryReference(referenceId)
-                    }
+                    focusManager.clearFocus()
+                    onOpenGlossaryReference(referenceId)
                 }
             )
         }
@@ -295,10 +292,11 @@ private fun DetailLoadingSkeleton() {
         repeat(3) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
+                shape = ShinjikaiUi.CardShape,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                )
+                ),
+                border = ShinjikaiUi.cardBorder(alpha = 0.24f)
             ) {
                 Box(modifier = Modifier.fillMaxWidth().height(82.dp))
             }
@@ -313,8 +311,9 @@ private fun DetailLoadingSkeleton() {
 private fun DetailStateCard(title: String, message: String, actionLabel: String, onAction: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = ShinjikaiUi.CardShape,
+        colors = ShinjikaiUi.cardColors(),
+        border = ShinjikaiUi.cardBorder()
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -448,21 +447,6 @@ internal fun formatEpochAsLocal(epochMs: Long): String {
     }.getOrDefault("-")
 }
 
-@Composable
-internal fun ModeBadge(useOfflineMode: Boolean) {
-    val label = if (useOfflineMode) stringResource(R.string.mode_offline) else stringResource(R.string.mode_online)
-    val bg = if (useOfflineMode) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
-    val fg = if (useOfflineMode) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
-    Surface(color = bg, shape = RoundedCornerShape(999.dp)) {
-        Text(
-            text = label,
-            color = fg,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-        )
-    }
-}
-
 private fun commonnessStars(difficulty: Int): String {
     if (difficulty !in 1..5) return ""
     return buildString {
@@ -475,7 +459,7 @@ private fun commonnessStars(difficulty: Int): String {
 internal fun CommonnessBadge(difficulty: Int, modifier: Modifier = Modifier) {
     val stars = commonnessStars(difficulty)
     if (stars.isEmpty()) return
-    Surface(modifier = modifier, shape = RoundedCornerShape(999.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+    Surface(modifier = modifier, shape = ShinjikaiUi.PillShape, color = MaterialTheme.colorScheme.secondaryContainer) {
         Text(
             text = stringResource(R.string.detail_commonness_label, stars),
             style = MaterialTheme.typography.labelSmall,
@@ -489,8 +473,9 @@ internal fun CommonnessBadge(difficulty: Int, modifier: Modifier = Modifier) {
 internal fun CategorySearchBanner(label: String, onClear: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        shape = ShinjikaiUi.CardShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        border = ShinjikaiUi.cardBorder(alpha = 0.28f)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
@@ -518,8 +503,9 @@ private fun DetailWordHeaderCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = ShinjikaiUi.CardShape,
+        colors = ShinjikaiUi.cardColors(),
+        border = ShinjikaiUi.cardBorder(alpha = 0.72f)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 22.dp),
@@ -535,7 +521,7 @@ private fun DetailWordHeaderCard(
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 ) {
-                    Icon(imageVector = Icons.Filled.VolumeUp, contentDescription = pronounceLabel)
+                    Icon(imageVector = Icons.AutoMirrored.Filled.VolumeUp, contentDescription = pronounceLabel)
                 }
             }
             Text(
@@ -552,7 +538,7 @@ private fun DetailWordHeaderCard(
                     chips.forEach { chip ->
                         val isCategory = chip.id > 0
                         Surface(
-                            shape = RoundedCornerShape(999.dp),
+                            shape = ShinjikaiUi.PillShape,
                             color = if (isCategory) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
                             modifier = if (isCategory) Modifier.clickable { onCategoryClick(chip) } else Modifier
                         ) {
@@ -586,8 +572,9 @@ private fun DefinitionsCard(
     val canExpand = definition.length > 260 || definition.count { it == '\n' } >= 4
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = ShinjikaiUi.CardShape,
+        colors = ShinjikaiUi.cardColors(),
+        border = ShinjikaiUi.cardBorder(alpha = 0.72f)
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
             Text(text = title, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
@@ -612,7 +599,7 @@ private fun DefinitionsCard(
                 ) {
                     content.references.forEach { reference ->
                         Surface(
-                            shape = RoundedCornerShape(999.dp),
+                            shape = ShinjikaiUi.PillShape,
                             color = MaterialTheme.colorScheme.primaryContainer,
                             modifier = Modifier.clickable { onGlossaryReferenceClick(reference.id) }
                         ) {
@@ -716,8 +703,9 @@ private fun MeaningEntriesCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = ShinjikaiUi.CardShape,
+        colors = ShinjikaiUi.cardColors(),
+        border = ShinjikaiUi.cardBorder()
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
@@ -744,8 +732,9 @@ private fun MeaningEntryCard(
     onImageClick: (String) -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        shape = ShinjikaiUi.CompactShape,
+        color = ShinjikaiUi.panelColor(alpha = 0.28f),
+        border = ShinjikaiUi.cardBorder(alpha = 0.32f)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
@@ -849,10 +838,11 @@ private fun EntryPicturesRow(
 @Composable
 private fun PictureCard(url: String, onClick: () -> Unit) {
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = ShinjikaiUi.CardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
         ),
+        border = ShinjikaiUi.cardBorder(alpha = 0.32f),
         modifier = Modifier
             .size(width = 240.dp, height = 170.dp)
             .clickable(onClick = onClick)
@@ -891,7 +881,7 @@ private fun ZoomableImageDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding(),
-            shape = RoundedCornerShape(28.dp),
+            shape = ShinjikaiUi.CardShape,
             color = Color.Black.copy(alpha = 0.92f)
         ) {
             Column(
@@ -918,7 +908,7 @@ private fun ZoomableImageDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(420.dp)
-                        .clip(RoundedCornerShape(20.dp)),
+                        .clip(ShinjikaiUi.CompactShape),
                     contentAlignment = Alignment.Center
                 ) {
                     SubcomposeAsyncImage(
@@ -985,8 +975,9 @@ private fun RelatedWordsCard(
     val wordFallback = stringResource(R.string.detail_word_fallback)
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = ShinjikaiUi.CardShape,
+        colors = ShinjikaiUi.cardColors(),
+        border = ShinjikaiUi.cardBorder()
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(text = title, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
@@ -998,7 +989,7 @@ private fun RelatedWordsCard(
                 ) {
                     items.take(visibleCount).forEach { item ->
                         Surface(
-                            shape = RoundedCornerShape(999.dp),
+                            shape = ShinjikaiUi.PillShape,
                             color = MaterialTheme.colorScheme.primaryContainer,
                             modifier = Modifier.clickable { onWordClick(item) }
                         ) {
@@ -1060,8 +1051,9 @@ private fun ExamplesCard(
     val exampleCopiedMessage = stringResource(R.string.detail_example_copied)
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = ShinjikaiUi.CardShape,
+        colors = ShinjikaiUi.cardColors(),
+        border = ShinjikaiUi.cardBorder()
     ) {
         Column {
             Row(
@@ -1084,7 +1076,7 @@ private fun ExamplesCard(
                         val displayText = item.text.ifBlank { item.kana.ifBlank { exampleFallback } }
                         Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
                             Surface(
-                                shape = RoundedCornerShape(999.dp),
+                                shape = ShinjikaiUi.PillShape,
                                 color = MaterialTheme.colorScheme.secondaryContainer,
                                 modifier = Modifier.clickable {
                                     clipboardManager.setText(AnnotatedString(displayText))

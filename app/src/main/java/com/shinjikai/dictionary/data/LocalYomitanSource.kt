@@ -2,8 +2,6 @@ package com.shinjikai.dictionary.data
 
 import com.google.gson.Gson
 import com.google.gson.JsonArray
-import java.io.File
-
 private val BULLET_PREFIX_REGEX = Regex("""(?m)^\s*[\uD83D\uDD39\u25AA\u2022\u25CF\u25E6]\s*""")
 private val MULTISPACE_REGEX = Regex("""\s{2,}""")
 private val ARABIC_DIACRITICS_REGEX = Regex("""[\u064B-\u065F\u0670\u06D6-\u06ED]""")
@@ -143,14 +141,13 @@ class LocalYomitanSource(
         return runCatching {
             val row = yomitanDao.getById(id)
                 ?: error("No local entry found for id=$id")
-            val imageDirectory = yomitanDao.getMetaValue(OFFLINE_IMAGE_DIR_META_KEY)
+            val imageRoot = yomitanDao.getMetaValue(OFFLINE_IMAGE_DIR_META_KEY)
                 ?.takeIf { it.isNotBlank() }
-                ?.let(::File)
             row.detailsJson
                 ?.takeIf { it.isNotBlank() }
                 ?.let { serialized ->
                     return@runCatching gson.fromJson(serialized, WordDetailsResponse::class.java)
-                        .withResolvedOfflineImages(imageDirectory)
+                        .withResolvedOfflineImages(imageRoot)
                 }
             WordDetailsResponse(
                 word = WordDetailsWord(

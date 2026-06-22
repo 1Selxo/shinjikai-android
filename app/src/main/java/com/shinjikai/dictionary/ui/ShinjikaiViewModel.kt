@@ -3,6 +3,7 @@ package com.shinjikai.dictionary.ui
 import android.app.Application
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -17,8 +18,11 @@ import androidx.paging.cachedIn
 import com.shinjikai.dictionary.R
 import com.shinjikai.dictionary.data.AppDatabase
 import com.shinjikai.dictionary.data.AppSettings
+import com.shinjikai.dictionary.data.AppThemeMode
 import com.shinjikai.dictionary.data.BookmarkItem
 import com.shinjikai.dictionary.data.BookmarkRepository
+import com.shinjikai.dictionary.data.BrowsePagingSource
+import com.shinjikai.dictionary.data.BundledDictionaryInstaller
 import com.shinjikai.dictionary.data.ClientIdStore
 import com.shinjikai.dictionary.data.DictionarySource
 import com.shinjikai.dictionary.data.LocalYomitanSource
@@ -42,6 +46,7 @@ import com.shinjikai.dictionary.data.extractOfflineArchive
 import com.shinjikai.dictionary.data.extractTarXzStream
 import com.shinjikai.dictionary.data.extractZipStream
 import com.shinjikai.dictionary.data.findOfflineImportPayload
+import com.shinjikai.dictionary.data.toBrowseSearchItem
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -68,6 +73,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     private val recentSearchStore = RecentSearchStore(context)
     private val bookmarkRepository = BookmarkRepository(database.bookmarkDao(), database.yomitanDao())
     private val clientId = ClientIdStore.getOrCreate(context)
+    private val bundledDictionaryInstaller = BundledDictionaryInstaller(context, database)
     private val searchSpec = MutableStateFlow<SearchRequestSpec?>(null)
     private val searchRefreshNonce = MutableStateFlow(0)
     private var detailsLoadJob: Job? = null
@@ -108,6 +114,20 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
 
     val bookmarkPagingFlow: Flow<PagingData<BookmarkItem>> =
         bookmarkRepository.pagedFlow().cachedIn(viewModelScope)
+
+    val browsePagingFlow: Flow<PagingData<SearchItem>> = searchRefreshNonce
+        .flatMapLatest {
+            Pager(
+                config = PagingConfig(
+                    pageSize = 60,
+                    initialLoadSize = 90,
+                    prefetchDistance = 30,
+                    enablePlaceholders = false
+                ),
+                pagingSourceFactory = { BrowsePagingSource(database.yomitanDao()) }
+            ).flow
+        }
+        .cachedIn(viewModelScope)
 
     private val yomitanImporter = YomitanImporter(database)
     private val rawShinjikaiImporter = RawShinjikaiImporter(database)
@@ -167,7 +187,12 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
             activeCategoryName = activeCategoryName,
             resultMode = searchSpec.value?.mode ?: ResultMode.None,
             recentSearches = recentSearches.toList(),
-            offlinePreviewItems = offlinePreviewItems.toList()
+            offlinePreviewItems = offlinePreviewItems.toList(),
+            isImportingOfflineData = isImportingOfflineData,
+            offlineImportError = offlineImportError,
+            offlineImportStatus = offlineImportStatus,
+            offlineImportPhase = offlineImportPhase,
+            offlineTermCount = offlineTermCount
         )
 
     val detailUiState: DetailUiState
@@ -207,6 +232,8 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         )
 
     init {
+        installBundledDictionaryIfNeeded()
+        viewModelScope.launch { settingsStore.setUseOfflineMode(true) }
         refreshOfflineTermCount()
         refreshOfflinePreview()
 
@@ -479,16 +506,81 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setDarkMode(enabled) }
     }
 
+    fun setThemeMode(mode: AppThemeMode) {
+        viewModelScope.launch { settingsStore.setThemeMode(mode) }
+    }
+
     fun setUseDynamicColor(enabled: Boolean) {
         viewModelScope.launch { settingsStore.setUseDynamicColor(enabled) }
     }
 
-    fun setUseOfflineMode(enabled: Boolean) {
-        if (activeUseOfflineMode != enabled) {
-            activeUseOfflineMode = enabled
-            dictionarySource = createDictionarySource(enabled)
+    fun openRandomDictionaryEntry(onEntry: (SearchItem) -> Unit) {
+        viewModelScope.launch {
+            val item = withContext(Dispatchers.IO) {
+                database.yomitanDao()
+                    .loadPreviewTerms(limit = 1)
+                    .firstOrNull()
+                    ?.toBrowseSearchItem()
+            }
+            item?.let(onEntry)
         }
-        viewModelScope.launch { settingsStore.setUseOfflineMode(enabled) }
+    }
+
+    fun setUseOfflineMode(enabled: Boolean) {
+        if (!activeUseOfflineMode) {
+            activeUseOfflineMode = true
+            dictionarySource = createDictionarySource(useOfflineMode = true)
+        }
+        viewModelScope.launch { settingsStore.setUseOfflineMode(true) }
+    }
+
+    fun retryBundledDictionaryInstall() {
+        installBundledDictionaryIfNeeded(force = true)
+    }
+
+    private fun installBundledDictionaryIfNeeded(force: Boolean = false) {
+        if (!bundledDictionaryInstaller.hasBundledDictionary() || isImportingOfflineData) return
+        viewModelScope.launch {
+            isImportingOfflineData = true
+            offlineImportError = false
+            offlineImportStatus = null
+            offlineImportProgress = 0f
+            offlineImportPhase = context.getString(R.string.offline_import_phase_prepare)
+
+            Log.i(TAG, "Starting bundled dictionary install. force=$force")
+            val result = bundledDictionaryInstaller.installIfNeeded(force = force) { phase, progress ->
+                offlineImportPhase = phase
+                offlineImportProgress = progress
+            }
+
+            isImportingOfflineData = false
+            offlineImportPhase = null
+            result.onSuccess { installResult ->
+                offlineImportError = false
+                offlineImportProgress = 1f
+                if (installResult.available && installResult.installed) {
+                    offlineImportStatus = context.getString(
+                        R.string.offline_import_success,
+                        installResult.importedCount
+                    )
+                    categoryNameById = emptyMap()
+                    refreshOfflineTermCount()
+                    refreshOfflinePreview()
+                    dictionarySource = createDictionarySource(useOfflineMode = true)
+                    searchRefreshNonce.value = searchRefreshNonce.value + 1
+                } else {
+                    offlineImportStatus = null
+                    refreshOfflineTermCount()
+                    refreshOfflinePreview()
+                }
+            }.onFailure { throwable ->
+                Log.e(TAG, "Bundled dictionary install failed", throwable)
+                offlineImportError = true
+                offlineImportStatus = throwable.toImportFailureMessage(
+                    context.getString(R.string.offline_import_failure)
+                )
+            }
+        }
     }
 
     fun setSelectedAnkiDeckName(name: String) {
@@ -824,11 +916,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun createDictionarySource(useOfflineMode: Boolean): DictionarySource {
-        return if (useOfflineMode) {
-            LocalYomitanSource(database.yomitanDao())
-        } else {
-            RemoteDictionarySource(clientId = clientId, cacheDir = context.cacheDir)
-        }
+        return LocalYomitanSource(database.yomitanDao())
     }
 
     private companion object {
@@ -838,5 +926,6 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         private const val OFFLINE_CATEGORIES_META_KEY = "categories_json"
         private const val PICKED_ZIP_SHINJIKAI_SOURCE = "raw-shinjikai-jp-ar-picked-zip"
         private const val PICKED_TXZ_SHINJIKAI_SOURCE = "raw-shinjikai-jp-ar-picked-tar-xz"
+        private const val TAG = "ShinjikaiViewModel"
     }
 }

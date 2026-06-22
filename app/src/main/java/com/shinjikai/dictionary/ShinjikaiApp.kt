@@ -54,11 +54,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -78,11 +73,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -197,67 +189,16 @@ fun ShinjikaiApp(
     LaunchedEffect(externalDeepLink) {
         val incoming = externalDeepLink?.trim().orEmpty()
         if (incoming.isNotBlank()) {
-            navController.navigate(Uri.parse(incoming))
+            runCatching {
+                navController.navigate(Uri.parse(incoming))
+            }.onFailure {
+                navController.navigateToPrimary(AppRoute.Search)
+            }
             onExternalDeepLinkConsumed()
         }
     }
 
-    val darkColors = darkColorScheme(
-        primary = androidx.compose.ui.graphics.Color(0xFF8AB4F8),
-        onPrimary = androidx.compose.ui.graphics.Color(0xFF0D1B2A),
-        secondary = androidx.compose.ui.graphics.Color(0xFF80CBC4),
-        background = androidx.compose.ui.graphics.Color(0xFF0E1116),
-        surface = androidx.compose.ui.graphics.Color(0xFF171B22),
-        surfaceVariant = androidx.compose.ui.graphics.Color(0xFF222733),
-        onBackground = androidx.compose.ui.graphics.Color(0xFFE8EAED),
-        onSurface = androidx.compose.ui.graphics.Color(0xFFE8EAED)
-    )
-    val lightColors = lightColorScheme(
-        primary = androidx.compose.ui.graphics.Color(0xFF2A5EA8),
-        onPrimary = androidx.compose.ui.graphics.Color.White,
-        secondary = androidx.compose.ui.graphics.Color(0xFF00796B),
-        background = androidx.compose.ui.graphics.Color(0xFFF4F7FB),
-        surface = androidx.compose.ui.graphics.Color.White,
-        surfaceVariant = androidx.compose.ui.graphics.Color(0xFFDCE4F0),
-        onBackground = androidx.compose.ui.graphics.Color(0xFF10131A),
-        onSurface = androidx.compose.ui.graphics.Color(0xFF10131A)
-    )
-    val colorScheme = when {
-        settings.useDynamicColor && supportsDynamicColor && settings.darkMode -> dynamicDarkColorScheme(context).copy(
-            background = darkColors.background,
-            surface = darkColors.surface,
-            surfaceVariant = darkColors.surfaceVariant
-        )
-        settings.useDynamicColor && supportsDynamicColor -> dynamicLightColorScheme(context).copy(
-            background = lightColors.background,
-            surface = lightColors.surface,
-            surfaceVariant = lightColors.surfaceVariant
-        )
-        settings.darkMode -> darkColors
-        else -> lightColors
-    }
-
-    val arabicFontFamily = FontFamily(Font(R.font.noto_sans_arabic))
-    val baseTypography = Typography()
-    val appTypography = Typography(
-        displayLarge = baseTypography.displayLarge.copy(fontFamily = arabicFontFamily),
-        displayMedium = baseTypography.displayMedium.copy(fontFamily = arabicFontFamily),
-        displaySmall = baseTypography.displaySmall.copy(fontFamily = arabicFontFamily),
-        headlineLarge = baseTypography.headlineLarge.copy(fontFamily = arabicFontFamily),
-        headlineMedium = baseTypography.headlineMedium.copy(fontFamily = arabicFontFamily),
-        headlineSmall = baseTypography.headlineSmall.copy(fontFamily = arabicFontFamily),
-        titleLarge = baseTypography.titleLarge.copy(fontFamily = arabicFontFamily),
-        titleMedium = baseTypography.titleMedium.copy(fontFamily = arabicFontFamily),
-        titleSmall = baseTypography.titleSmall.copy(fontFamily = arabicFontFamily),
-        bodyLarge = baseTypography.bodyLarge.copy(fontFamily = arabicFontFamily),
-        bodyMedium = baseTypography.bodyMedium.copy(fontFamily = arabicFontFamily),
-        bodySmall = baseTypography.bodySmall.copy(fontFamily = arabicFontFamily),
-        labelLarge = baseTypography.labelLarge.copy(fontFamily = arabicFontFamily),
-        labelMedium = baseTypography.labelMedium.copy(fontFamily = arabicFontFamily),
-        labelSmall = baseTypography.labelSmall.copy(fontFamily = arabicFontFamily)
-    )
-
-    MaterialTheme(colorScheme = colorScheme, typography = appTypography) {
+    ShinjikaiTheme(settings = settings, supportsDynamicColor = supportsDynamicColor) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
             val handleSearchTabClick = {
                 if (currentScreen == Screen.Search) {
@@ -275,6 +216,36 @@ fun ShinjikaiApp(
                         startDestination = AppRoute.Search.route,
                         modifier = Modifier.fillMaxSize()
                     ) {
+                        composable(
+                            route = AppRoute.Search.route,
+                            deepLinks = listOf(
+                                navDeepLink {
+                                    uriPattern = "shinjikai://app/search"
+                                },
+                                navDeepLink {
+                                    uriPattern = "https://shinjikai.app/search"
+                                }
+                            ),
+                            enterTransition = { primaryEnterTransition() },
+                            exitTransition = { primaryExitTransition() },
+                            popEnterTransition = { primaryPopEnterTransition() },
+                            popExitTransition = { primaryPopExitTransition() }
+                        ) {
+                            SearchScreenContent(
+                                appName = appName,
+                                useOfflineMode = settings.useOfflineMode,
+                                hasOfflineDictionary = viewModel.settingsUiState.offlineTermCount > 0,
+                                searchFocusNonce = viewModel.searchFocusNonce,
+                                viewModel = viewModel,
+                                uiState = viewModel.searchUiState,
+                                searchResults = viewModel.searchResults,
+                                onRetryBundledImport = viewModel::retryBundledDictionaryInstall,
+                                onOpenDetails = {
+                                    focusManager.clearFocus()
+                                    navController.navigate(buildDetailRoute(it.id))
+                                }
+                            )
+                        }
                         composable(
                             route = "${AppRoute.Search.route}?${AppRoute.SEARCH_QUERY_ARG}={${AppRoute.SEARCH_QUERY_ARG}}",
                             arguments = listOf(
@@ -311,10 +282,23 @@ fun ShinjikaiApp(
                                 viewModel = viewModel,
                                 uiState = viewModel.searchUiState,
                                 searchResults = viewModel.searchResults,
-                                onSettingsClick = {
+                                onRetryBundledImport = viewModel::retryBundledDictionaryInstall,
+                                onOpenDetails = {
                                     focusManager.clearFocus()
-                                    navController.navigateToPrimary(AppRoute.Settings)
-                                },
+                                    navController.navigate(buildDetailRoute(it.id))
+                                }
+                            )
+                        }
+                        composable(AppRoute.Browse.route,
+                            enterTransition = { primaryEnterTransition() },
+                            exitTransition = { primaryExitTransition() },
+                            popEnterTransition = { primaryPopEnterTransition() },
+                            popExitTransition = { primaryPopExitTransition() }
+                        ) {
+                            BrowseScreenContent(
+                                viewModel = viewModel,
+                                browseFlow = viewModel.browsePagingFlow,
+                                totalEntries = viewModel.settingsUiState.offlineTermCount,
                                 onOpenDetails = {
                                     focusManager.clearFocus()
                                     navController.navigate(buildDetailRoute(it.id))
@@ -471,13 +455,17 @@ fun ShinjikaiApp(
                         }
                     }
 
-                    if (currentScreen in setOf(Screen.Search, Screen.History, Screen.Bookmarks, Screen.Settings)) {
+                    if (currentScreen in setOf(Screen.Search, Screen.Browse, Screen.History, Screen.Bookmarks, Screen.Settings)) {
                         Box(
                             modifier = Modifier.align(Alignment.BottomCenter)
                         ) {
                             PrimaryBottomBar(
                                 currentScreen = currentScreen ?: Screen.Search,
                                 onSearchClick = handleSearchTabClick,
+                                onBrowseClick = {
+                                    focusManager.clearFocus()
+                                    navController.navigateToPrimary(AppRoute.Browse)
+                                },
                                 onHistoryClick = {
                                     focusManager.clearFocus()
                                     navController.navigateToPrimary(AppRoute.History)
@@ -633,9 +621,10 @@ private fun IntroPageCard(
         modifier = Modifier
             .fillMaxSize()
             .padding(vertical = 6.dp),
-        shape = RoundedCornerShape(28.dp),
+        shape = ShinjikaiUi.CardShape,
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp
+        border = ShinjikaiUi.cardBorder(),
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
@@ -855,7 +844,8 @@ private fun DetailScreenContent(
                             contentDescription = stringResource(R.string.nav_bookmarks)
                         )
                     }
-                }
+                },
+                colors = shinjikaiTopAppBarColors()
             )
         }
     ) { padding ->
@@ -895,9 +885,10 @@ private fun NavHostController.navigateToPrimary(route: AppRoute, targetRoute: St
 
 private fun primaryRouteIndex(screen: Screen?): Int = when (screen) {
     Screen.Search -> 0
-    Screen.History -> 1
-    Screen.Bookmarks -> 2
-    Screen.Settings -> 3
+    Screen.Browse -> 1
+    Screen.History -> 2
+    Screen.Bookmarks -> 3
+    Screen.Settings -> 4
     else -> 0
 }
 

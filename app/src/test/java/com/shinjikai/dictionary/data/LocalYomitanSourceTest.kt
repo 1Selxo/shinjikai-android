@@ -90,6 +90,9 @@ class LocalYomitanSourceTest {
 
         override suspend fun loadAllTerms(): List<YomitanTermEntity> = emptyList()
 
+        override suspend fun browseTermsPaged(limit: Int, offset: Int): List<YomitanTermEntity> =
+            directSearchResults.drop(offset).take(limit)
+
         override suspend fun upsertCategoryRefs(items: List<YomitanTermCategoryEntity>) = Unit
 
         override suspend fun clearCategoryRefs() = Unit

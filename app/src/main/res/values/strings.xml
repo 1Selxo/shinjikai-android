@@ -5,6 +5,7 @@
     <string name="nav_settings" comment="Navigation label for settings">الإعدادات</string>
     <string name="nav_clear">مسح</string>
     <string name="nav_search">بحث</string>
+    <string name="nav_browse">القاموس</string>
 
     <string name="detail_title">تفاصيل الكلمة</string>
     <string name="detail_not_selected">لم يتم اختيار كلمة</string>
@@ -69,6 +70,11 @@
     <string name="action_cancel">إلغاء</string>
 
     <string name="settings_title" comment="Title for the settings screen">الإعدادات</string>
+    <string name="settings_appearance_title">المظهر</string>
+    <string name="settings_theme_mode">نمط الواجهة</string>
+    <string name="settings_theme_system">النظام</string>
+    <string name="settings_theme_light">فاتح</string>
+    <string name="settings_theme_dark">داكن</string>
     <string name="settings_dark_mode">الوضع الداكن</string>
     <string name="settings_dynamic_color">الألوان الديناميكية</string>
     <string name="settings_offline_mode">وضع عدم الاتصال بالإنترنت</string>
@@ -89,9 +95,6 @@
     <string name="settings_github">الكود المصدري</string>
     <string name="settings_open_github">فتح GitHub</string>
 
-    <string name="mode_online">متصل</string>
-    <string name="mode_offline">غير متصل</string>
-
     <string name="error_details_load">تعذّر تحميل التفاصيل</string>
     <string name="error_bookmark_not_available_offline">هذه الكلمة غير محفوظة بدون إنترنت. احذفها من المحفوظات ثم أضفها مرة أخرى أثناء الاتصال.</string>
     <string name="error_bookmark_save">تعذّر حفظ الكلمة في المحفوظات.</string>
@@ -105,12 +108,17 @@
     <string name="offline_images_install_success">تم تثبيت الصور المحلية. ستظهر الصور مع القاموس الحالي.</string>
     <string name="offline_import_failure">فشل تحميل القاموس المحلي.</string>
     <string name="offline_import_invalid_zip">ملف القاموس الذي تم تنزيله غير صالح.</string>
+    <string name="offline_dictionary_indexing_title">جاري تجهيز القاموس المحلي</string>
+    <string name="offline_dictionary_indexing_message">يتم فهرسة البيانات المدمجة داخل التطبيق. بعد اكتمال الفهرسة سيعمل البحث بدون إنترنت.</string>
+    <string name="offline_dictionary_missing_title">القاموس المحلي غير جاهز</string>
+    <string name="offline_dictionary_missing_message">لم يتم العثور على بيانات مفهرسة بعد. أعد محاولة تجهيز القاموس المدمج.</string>
+    <string name="offline_dictionary_retry">إعادة تجهيز القاموس</string>
     <string name="offline_download_prompt_title">&#x064A;&#x0644;&#x0632;&#x0645; &#x062A;&#x062D;&#x0645;&#x064A;&#x0644; &#x0627;&#x0644;&#x0642;&#x0627;&#x0645;&#x0648;&#x0633; &#x0627;&#x0644;&#x0645;&#x062D;&#x0644;&#x064A;</string>
     <string name="offline_download_prompt_message">&#x0644;&#x0627;&#x0633;&#x062A;&#x062E;&#x062F;&#x0627;&#x0645; &#x0627;&#x0644;&#x0628;&#x062D;&#x062B; &#x0628;&#x062F;&#x0648;&#x0646; &#x0625;&#x0646;&#x062A;&#x0631;&#x0646;&#x062A;&#x060C; &#x062D;&#x0645;&#x0651;&#x0644; &#x0627;&#x0644;&#x0642;&#x0627;&#x0645;&#x0648;&#x0633; &#x0627;&#x0644;&#x0645;&#x062D;&#x0644;&#x064A; &#x0623;&#x0648;&#x0644;&#x0627;&#x064B;. &#x0647;&#x0644; &#x062A;&#x0631;&#x0649;&#x062F; &#x0627;&#x0644;&#x0627;&#x0646;&#x062A;&#x0642;&#x0627;&#x0644; &#x0625;&#x0644;&#x0649; &#x0635;&#x0641;&#x062D;&#x0629; &#x0627;&#x0644;&#x0625;&#x0639;&#x062F;&#x0627;&#x062A;&#x0627;&#x062A;&#x061F;</string>
     <string name="offline_download_prompt_confirm">&#x0646;&#x0639;&#x0645;&#x060C; &#x062D;&#x0648;&#x0651;&#x0644;&#x0646;&#x064A;</string>
     <string name="settings_attribution_title">&#x0645;&#x0635;&#x062F;&#x0631; &#x0627;&#x0644;&#x0628;&#x064A;&#x0627;&#x0646;&#x0627;&#x062A;</string>
-    <string name="settings_attribution_description">&#x064A;&#x0639;&#x062A;&#x0645;&#x062F; &#x0627;&#x0644;&#x0628;&#x062D;&#x062B; &#x0648;&#x062A;&#x0641;&#x0627;&#x0635;&#x064A;&#x0644; &#x0627;&#x0644;&#x0643;&#x0644;&#x0645;&#x0627;&#x062A; &#x0639;&#x0644;&#x0649; API &#x0627;&#x0644;&#x0645;&#x0642;&#x062F;&#x0645;&#x0629; &#x0645;&#x0646; Shinjikai.</string>
-    <string name="settings_attribution_open">&#x0641;&#x062A;&#x062D; &#x0645;&#x0648;&#x0642;&#x0639; Shinjikai</string>
+    <string name="settings_attribution_description">Dictionary data is bundled from 1Selxo/Shinjikai and indexed locally on device.</string>
+    <string name="settings_attribution_open">Open bundled dictionary source</string>
     <string name="history_clear_all_confirm_title">حذف كل سجل البحث؟</string>
     <string name="history_clear_all_confirm_message">سيتم حذف جميع عمليات البحث المحفوظة.</string>
     <string name="detail_add_to_anki">&#x0625;&#x0636;&#x0627;&#x0641;&#x0629; &#x0625;&#x0644;&#x0649; Anki</string>
@@ -120,6 +128,11 @@
     <string name="detail_add_to_anki_not_installed">AnkiDroid &#x063A;&#x064A;&#x0631; &#x0645;&#x062B;&#x0628;&#x062A; &#x0639;&#x0644;&#x0649; &#x0627;&#x0644;&#x062C;&#x0647;&#x0627;&#x0632;.</string>
     <string name="search_try_japanese_words">&#x062C;&#x0631;&#x0651;&#x0628; &#x0643;&#x0644;&#x0645;&#x0627;&#x062A; &#x064A;&#x0627;&#x0628;&#x0627;&#x0646;&#x064A;&#x0629; &#x0645;&#x062B;&#x0644;</string>
     <string name="search_try_other_words">&#x062C;&#x0631;&#x0651;&#x0628; &#x0643;&#x0644;&#x0645;&#x0627;&#x062A; &#x0623;&#x062E;&#x0631;&#x0649;</string>
+    <string name="browse_title">تصفح القاموس</string>
+    <string name="browse_subtitle">كل المداخل المفهرسة في القاموس</string>
+    <string name="browse_count">%1$d مدخل</string>
+    <string name="browse_empty">لم يتم تجهيز القاموس بعد.</string>
+    <string name="browse_random">مدخل عشوائي</string>
     <string name="settings_anki_section_title">Anki</string>
     <string name="settings_anki_exporter_title">&#x0645;&#x0635;&#x062F;&#x0651;&#x0631; Anki</string>
     <string name="settings_anki_exporter_description">&#x0627;&#x062E;&#x062A;&#x0631; &#x0627;&#x0644;&#x0631;&#x0632;&#x0645;&#x0629; &#x0627;&#x0644;&#x062A;&#x064A; &#x0633;&#x062A;&#x064F;&#x0635;&#x062F;&#x0651;&#x0631; &#x0625;&#x0644;&#x064A;&#x0647;&#x0627; &#x0627;&#x0644;&#x0643;&#x0644;&#x0645;&#x0627;&#x062A;.</string>
