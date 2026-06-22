@@ -4,6 +4,7 @@ import com.google.gson.JsonParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class OfflineImageSupportTest {
     @Test
@@ -35,7 +36,7 @@ class OfflineImageSupportTest {
 
     @Test
     fun `resolved offline images keep absolute file paths for bookmarked details`() {
-        val imageRoot = "C:/offline/yomitan_images"
+        val imageRoot = File("build/test-offline/yomitan_images").absolutePath.replace('\\', '/')
         val details = WordDetailsResponse(
             word = WordDetailsWord(
                 id = 2,
@@ -58,8 +59,8 @@ class OfflineImageSupportTest {
             .pictures
             .map { it.asString }
 
-        assertEquals("C:/offline/yomitan_images/animals/cat.jpg", pictures[0])
-        assertEquals("C:/offline/yomitan_images/already.png", pictures[1])
+        assertEquals("$imageRoot/animals/cat.jpg", pictures[0])
+        assertEquals("$imageRoot/already.png", pictures[1])
     }
 
     @Test
