@@ -26,7 +26,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,71 +57,49 @@ fun HistoryScreenContent(
     var pendingClearAllHistory by remember { mutableStateOf(false) }
 
     Scaffold(
-        containerColor = Color.Transparent,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.history_title)) },
-                colors = shinjikaiTopAppBarColors()
-            )
-        }
+        containerColor = Color.Transparent
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
             if (uiState.recentSearches.isEmpty()) {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding)
-                        .padding(horizontal = 16.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Text(
-                        text = stringResource(R.string.history_empty),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
-                        textAlign = TextAlign.Center
+                    ShinjikaiPageHeader(
+                        title = stringResource(R.string.history_title),
+                        subtitle = stringResource(R.string.search_recent_subtitle),
+                        icon = Icons.Default.History
                     )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.history_empty),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding)
-                        .padding(horizontal = 16.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item(key = "history-header") {
-                        Surface(
-                            shape = ShinjikaiUi.CardShape,
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                            border = ShinjikaiUi.cardBorder()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.History,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.search_recent_title),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.search_recent_subtitle),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.64f)
-                                    )
-                                }
+                        ShinjikaiPageHeader(
+                            title = stringResource(R.string.history_title),
+                            subtitle = stringResource(R.string.search_recent_subtitle),
+                            icon = Icons.Default.History,
+                            action = {
                                 IconButton(onClick = { pendingClearAllHistory = true }) {
                                     Icon(
                                         imageVector = Icons.Default.ClearAll,
@@ -130,7 +107,7 @@ fun HistoryScreenContent(
                                     )
                                 }
                             }
-                        }
+                        )
                     }
 
                     items(uiState.recentSearches, key = { it.term.lowercase(Locale.ROOT) }) { historyEntry ->
@@ -138,7 +115,7 @@ fun HistoryScreenContent(
                             modifier = Modifier.fillMaxWidth(),
                             shape = ShinjikaiUi.CardShape,
                             color = MaterialTheme.colorScheme.surface,
-                            border = ShinjikaiUi.cardBorder(),
+                            border = ShinjikaiUi.cardBorder(alpha = 0.22f),
                             tonalElevation = 0.dp
                         ) {
                             Row(

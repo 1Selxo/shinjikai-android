@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -93,23 +94,23 @@ fun SettingsScreenContent(
     val context = LocalContext.current
 
     Scaffold(
-        containerColor = Color.Transparent,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_title)) },
-                colors = shinjikaiTopAppBarColors()
-            )
-        }
+        containerColor = Color.Transparent
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 32.dp)
+                    .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 20.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                ShinjikaiPageHeader(
+                    title = stringResource(R.string.settings_title),
+                    subtitle = stringResource(R.string.settings_appearance_title),
+                    icon = Icons.Filled.Settings
+                )
+
                 ShinjikaiCard(
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = 14.dp
@@ -590,9 +591,9 @@ private fun LocalDictionarySummaryCard(
         uiState.offlineImportError ->
             uiState.offlineImportStatus ?: stringResource(R.string.offline_import_failure)
         hasOfflineDictionary ->
-            "افتح هذه الصفحة لإدارة القاموس المحلي والاستيراد."
+            "إدارة بيانات القاموس والاستيراد."
         else ->
-            "افتح هذه الصفحة لتثبيت القاموس المحلي وإدارة الاستيراد."
+            "تجهيز بيانات القاموس وإدارة الاستيراد."
     }
 
     Row(
@@ -653,9 +654,9 @@ private fun OfflineImporterCard(
         uiState.isImportingOfflineData ->
             uiState.offlineImportPhase ?: stringResource(R.string.settings_loading_inline)
         hasOfflineDictionary ->
-            "تم تثبيت ${uiState.offlineTermCount} مدخل محلي ويمكنك استخدام البحث بدون اتصال."
+            "تم تثبيت ${uiState.offlineTermCount} مدخل ويمكنك استخدام البحث بدون اتصال."
         else ->
-            "اختر أرشيف `.zip` أو `.tar.xz` لاستيراد النصوص والصور محلياً."
+            "اختر أرشيف `.zip` أو `.tar.xz` لاستيراد النصوص والصور."
     }
     val latestUpdateText = uiState.offlineLastImportEpochMs?.let(::formatEpochAsLocal) ?: "لم يتم الاستيراد بعد"
     val latestSourceText = uiState.offlineLastImportSource?.let(::formatImportSourceName) ?: "لا يوجد مصدر مسجل بعد"

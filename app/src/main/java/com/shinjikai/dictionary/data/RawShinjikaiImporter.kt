@@ -84,6 +84,23 @@ class RawShinjikaiImporter(
                                 val id = word.id
                                 if (id <= 0) continue
 
+                                val normalizedWord = word.copy(
+                                    pictures = word.pictures.orEmpty()
+                                        .mapNotNull(::normalizeStoredPictureElement),
+                                    meanings = word.meanings.map { meaning ->
+                                        meaning.copy(
+                                            pictures = meaning.pictures.mapNotNull(::normalizeStoredPictureElement)
+                                        )
+                                    }
+                                )
+                                val expression = normalizedWord.writings.firstOrNull()
+                                    ?.text
+                                    ?.trim()
+                                    .orEmpty()
+                                    .ifBlank { normalizedWord.kana.trim() }
+                                val reading = normalizedWord.kana.trim().ifBlank { expression }
+                                if (!hasDictionaryHeadword(expression, reading)) continue
+
                                 record.categories.forEach { category ->
                                     if (category.id > 0 && category.name.isNotBlank()) {
                                         categoriesById.putIfAbsent(category.id, category)
@@ -96,31 +113,25 @@ class RawShinjikaiImporter(
                                     }
                                 }
 
-                                val normalizedWord = word.copy(
-                                    meanings = word.meanings.map { meaning ->
-                                        meaning.copy(
-                                            pictures = meaning.pictures.mapNotNull(::normalizeStoredPictureElement)
-                                        )
-                                    }
-                                )
-
                                 val details = WordDetailsResponse(
                                     word = normalizedWord,
                                     similarWords = record.similarWords.map {
                                         WordRef(id = it.id, kana = it.kana, writings = it.writings)
                                     },
-                                    sentenceSearch = record.sentenceSearch
+                                    sentenceSearch = record.sentenceSearch,
+                                    sentenceMap = record.sentenceMap,
+                                    homophones = record.homophones.map {
+                                        WordRef(id = it.id, kana = it.kana, writings = it.writings)
+                                    },
+                                    kanjis = record.kanjis
                                 )
 
                                 buffer.add(
                                     YomitanTermEntity(
                                         id = id,
-                                        expression = normalizedWord.writings.firstOrNull()?.text?.trim()
-                                            .orEmpty()
-                                            .ifBlank { normalizedWord.kana.trim() },
-                                        reading = normalizedWord.kana.trim()
-                                            .ifBlank { normalizedWord.writings.firstOrNull()?.text?.trim().orEmpty() },
-                                        glossary = buildMeaningSummary(normalizedWord.meanings).ifBlank { "-" },
+                                        expression = expression,
+                                        reading = reading,
+                                        glossary = buildMeaningSummary(normalizedWord.meanings),
                                         difficulty = normalizedWord.difficulty,
                                         note = normalizedWord.meanings.firstOrNull()?.note.orEmpty().trim(),
                                         source = sourceLabel,
@@ -206,9 +217,16 @@ class RawShinjikaiImporter(
     }
 }
 
+internal fun hasDictionaryHeadword(expression: String, reading: String): Boolean {
+    return expression.isNotBlank() || reading.isNotBlank()
+}
+
 private data class RawShinjikaiRecord(
     @SerializedName("Word") val word: WordDetailsWord? = null,
     @SerializedName("Categories") val categories: List<CategoryRef> = emptyList(),
     @SerializedName("SimilarWords") val similarWords: List<SearchItem> = emptyList(),
-    @SerializedName("SentenceSearch") val sentenceSearch: List<SentenceExample> = emptyList()
+    @SerializedName("SentenceSearch") val sentenceSearch: List<SentenceExample> = emptyList(),
+    @SerializedName("SentenceMap") val sentenceMap: Map<String, SentenceExample> = emptyMap(),
+    @SerializedName("Homophones") val homophones: List<SearchItem> = emptyList(),
+    @SerializedName("Kanjis") val kanjis: List<KanjiInfo> = emptyList()
 )

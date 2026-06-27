@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -21,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.tween
@@ -133,9 +133,19 @@ fun SearchScreenContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                ShinjikaiPageHeader(
+                    title = appName,
+                    subtitle = if (hasOfflineDictionary) {
+                        stringResource(R.string.browse_count, uiState.offlineTermCount)
+                    } else {
+                        stringResource(R.string.browse_subtitle)
+                    },
+                    icon = Icons.AutoMirrored.Filled.MenuBook
+                )
+
                 if (uiState.activeCategoryName == null) {
                     SearchTopDock(
                         term = uiState.term,
@@ -223,8 +233,14 @@ fun SearchScreenContent(
                                     LazyColumn(
                                         modifier = Modifier.weight(1f),
                                         contentPadding = PaddingValues(vertical = 4.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        verticalArrangement = Arrangement.spacedBy(5.dp)
                                     ) {
+                                        item(key = "preview-label") {
+                                            SectionLabel(
+                                                text = stringResource(R.string.browse_subtitle),
+                                                modifier = Modifier.padding(horizontal = 2.dp, vertical = 4.dp)
+                                            )
+                                        }
                                         items(
                                             items = uiState.offlinePreviewItems,
                                             key = { it.id }
@@ -286,7 +302,7 @@ fun SearchScreenContent(
                                 modifier = Modifier.fillMaxSize(),
                                 state = resultsListState,
                                 contentPadding = PaddingValues(vertical = 4.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(5.dp)
                             ) {
                                 items(
                                     count = lazyResults.itemCount,
@@ -431,65 +447,48 @@ private fun SearchTopDock(
             )
         }
 
-        Surface(
-            shape = ShinjikaiUi.CardShape,
-            color = MaterialTheme.colorScheme.surface,
-            border = ShinjikaiUi.cardBorder(),
-            tonalElevation = 1.dp,
-            shadowElevation = 0.dp
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                OutlinedTextField(
-                    value = term,
-                    onValueChange = onTermChange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester)
-                        .onGloballyPositioned { onFieldReady() },
-                    singleLine = true,
-                    placeholder = {
-                        Text(
-                            text = stringResource(R.string.search_hint),
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 0.dp, bottomEnd = 0.dp),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { onRunSearch() }),
-                    leadingIcon = {
+        OutlinedTextField(
+            value = term,
+            onValueChange = onTermChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester)
+                .onGloballyPositioned { onFieldReady() },
+            singleLine = true,
+            placeholder = {
+                Text(
+                    text = stringResource(R.string.search_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            },
+            shape = RoundedCornerShape(8.dp),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onRunSearch() }),
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = stringResource(R.string.nav_search)
+                )
+            },
+            trailingIcon = {
+                if (term.isNotEmpty()) {
+                    IconButton(onClick = onClearTerm) {
                         Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = stringResource(R.string.nav_search)
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.nav_clear)
                         )
-                    },
-                    trailingIcon = {
-                        if (term.isNotEmpty()) {
-                            IconButton(onClick = onClearTerm) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = stringResource(R.string.nav_clear)
-                                )
-                            }
-                        }
-                    },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    )
-                )
-
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)
-                )
-            }
-        }
+                    }
+                }
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+            )
+        )
     }
 }
 
@@ -529,20 +528,11 @@ private fun LandingSuggestions(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 suggestions.forEach { suggestion ->
-                    Surface(
+                    ShinjikaiChip(
+                        text = suggestion,
                         onClick = { onSuggestionClick(suggestion) },
-                        shape = ShinjikaiUi.PillShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-                        tonalElevation = 1.dp
-                    ) {
-                        Text(
-                            text = suggestion,
-                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                        selected = false
+                    )
                 }
             }
         }

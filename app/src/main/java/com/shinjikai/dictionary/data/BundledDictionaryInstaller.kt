@@ -29,7 +29,7 @@ class BundledDictionaryInstaller(
 
     suspend fun installIfNeeded(
         force: Boolean = false,
-        onProgress: (phase: String, progress: Float) -> Unit = { _, _ -> }
+        onProgress: suspend (phase: String, progress: Float) -> Unit = { _, _ -> }
     ): Result<BundledDictionaryInstallResult> {
         return runCatching {
             withContext(Dispatchers.IO) {
@@ -44,7 +44,7 @@ class BundledDictionaryInstaller(
 
                 val dao = database.yomitanDao()
                 val imageArchivePaths = findImageArchiveAssetPaths()
-                val signature = buildAssetSignature(jsonlPaths)
+                val signature = buildAssetSignature(jsonlPaths, schemaVersion = BUNDLED_DATA_SCHEMA)
                 val existingSignature = dao.getMetaValue(META_BUNDLED_SIGNATURE)
                 val existingCount = dao.countTerms()
                 val installedImages = installBundledImagesIfNeeded(
@@ -161,7 +161,7 @@ class BundledDictionaryInstaller(
     private suspend fun installBundledImagesIfNeeded(
         imageArchivePaths: List<String>,
         force: Boolean,
-        onProgress: (phase: String, progress: Float) -> Unit
+        onProgress: suspend (phase: String, progress: Float) -> Unit
     ): InstalledImageRoot? {
         if (imageArchivePaths.isEmpty()) return null
 
@@ -184,15 +184,24 @@ class BundledDictionaryInstaller(
         }
 
         onProgress("Installing bundled Shinjikai images", 0.04f)
-        if (targetImageDir.exists()) {
-            targetImageDir.deleteRecursively()
-        }
-        targetRoot.mkdirs()
-        openBundledImageArchive(imageArchivePaths).use { input ->
-            extractTarXzStream(input, targetRoot)
-        }
-        require(targetImageDir.exists() && targetImageDir.list().orEmpty().isNotEmpty()) {
-            "Bundled image archive did not contain yomitan_images."
+        val stagingRoot = File(context.filesDir, "offline-image-staging")
+        try {
+            if (stagingRoot.exists()) {
+                stagingRoot.deleteRecursively()
+            }
+            stagingRoot.mkdirs()
+            openBundledImageArchive(imageArchivePaths).use { input ->
+                extractTarXzStream(input, stagingRoot)
+            }
+            val stagingImageDir = File(stagingRoot, "yomitan_images")
+            require(stagingImageDir.isDirectory && stagingImageDir.walkTopDown().any(File::isFile)) {
+                "Bundled image archive did not contain yomitan_images."
+            }
+            replaceStagedDirectoryAtomically(stagingImageDir, targetImageDir)
+        } finally {
+            if (stagingRoot.exists()) {
+                stagingRoot.deleteRecursively()
+            }
         }
         dao.upsertMeta(YomitanMetaEntity(key = META_BUNDLED_IMAGE_SIGNATURE, value = signature))
         return InstalledImageRoot(
@@ -201,7 +210,10 @@ class BundledDictionaryInstaller(
         )
     }
 
-    private fun buildAssetSignature(assetPaths: List<String>): String {
+    private fun buildAssetSignature(
+        assetPaths: List<String>,
+        schemaVersion: Int? = null
+    ): String {
         val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
         @Suppress("DEPRECATION")
         val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -209,7 +221,8 @@ class BundledDictionaryInstaller(
         } else {
             packageInfo.versionCode.toLong()
         }
-        return "v$versionCode:${assetPaths.joinToString("|") { path -> "$path:${assetByteLength(path)}" }}"
+        val schemaPrefix = schemaVersion?.let { "schema$it-" }.orEmpty()
+        return "${schemaPrefix}v$versionCode:${assetPaths.joinToString("|") { path -> "$path:${assetByteLength(path)}" }}"
     }
 
     private fun openBundledImageArchive(assetPaths: List<String>): InputStream {
@@ -256,6 +269,7 @@ class BundledDictionaryInstaller(
 
     companion object {
         private const val TAG = "BundledDictionary"
+        private const val BUNDLED_DATA_SCHEMA = 2
         const val BUNDLED_SOURCE_LABEL = "bundled-1selxo-shinjikai-jsonl"
 
         private const val MAX_FALLBACK_CHUNK_INDEX = 99

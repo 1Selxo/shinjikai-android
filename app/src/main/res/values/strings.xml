@@ -12,7 +12,16 @@
     <string name="detail_definitions_title">المعاني</string>
     <string name="detail_pictures_title">الصور</string>
     <string name="detail_related_words_title">كلمات ذات صلة</string>
+    <string name="detail_similar_words_title">كلمات مشابهة</string>
     <string name="detail_examples_title">الأمثلة</string>
+    <string name="detail_meaning_examples_title">أمثلة هذا المعنى</string>
+    <string name="detail_additional_examples_title">أمثلة إضافية</string>
+    <string name="detail_japanese_definition">الشرح الياباني</string>
+    <string name="detail_homophones_title">كلمات متجانسة لفظاً</string>
+    <string name="detail_kanji_title">معلومات الكانجي</string>
+    <string name="detail_on_yomi">أون: %1$s</string>
+    <string name="detail_kun_yomi">كون: %1$s</string>
+    <string name="detail_copy_example">نسخ المثال</string>
     <string name="detail_note_prefix">ملاحظة:</string>
     <string name="detail_no_reading">لا توجد قراءة</string>
     <string name="detail_pronounce">نطق</string>
@@ -51,11 +60,11 @@
     <string name="intro_page_2_body">كل كلمة تفتح لك المعاني والأمثلة والكلمات ذات الصلة، ويمكنك حفظها في المحفوظات للرجوع إليها لاحقاً.</string>
     <string name="intro_page_3_eyebrow">الخطوة 3</string>
     <string name="intro_page_3_title">جهّز البحث بدون إنترنت</string>
-    <string name="intro_page_3_body">إذا أردت استخدام التطبيق بدون اتصال، افتح الإعدادات وحمّل القاموس المحلي مرة واحدة فقط.</string>
+    <string name="intro_page_3_body">القاموس مضمّن في التطبيق ويعمل بدون اتصال بعد التجهيز الأول.</string>
     <string name="intro_action_next">التالي</string>
     <string name="intro_action_start">ابدأ الآن</string>
     <string name="intro_action_skip">تخطّ المقدمة</string>
-    <string name="intro_action_offline_setup">الذهاب إلى إعداد القاموس المحلي</string>
+    <string name="intro_action_offline_setup">إعداد القاموس</string>
 
     <string name="bookmarks_title" comment="Title for the bookmarks screen">المحفوظات</string>
     <string name="bookmarks_selected_count">%1$d محدد</string>
@@ -78,11 +87,11 @@
     <string name="settings_dark_mode">الوضع الداكن</string>
     <string name="settings_dynamic_color">الألوان الديناميكية</string>
     <string name="settings_offline_mode">وضع عدم الاتصال بالإنترنت</string>
-    <string name="settings_local_dictionary">القاموس المحلي</string>
-    <string name="settings_local_count">العناصر المتوفرة محلياً: %1$d</string>
-    <string name="settings_last_local_update">آخر تحديث محلي: %1$s</string>
+    <string name="settings_local_dictionary">بيانات القاموس</string>
+    <string name="settings_local_count">العناصر المتوفرة: %1$d</string>
+    <string name="settings_last_local_update">آخر تحديث: %1$s</string>
     <string name="settings_loading_inline">جاري التحميل...</string>
-    <string name="settings_download_local_dictionary">تحميل القاموس المحلي</string>
+    <string name="settings_download_local_dictionary">تحميل بيانات القاموس</string>
     <string name="settings_offline_archives_title">تنزيل ملفات القاموس</string>
     <string name="settings_offline_archives_description">افتح صفحة الإصدار لتحميل أرشيف النص أو أرشيف الصور ثم استوردهما داخل التطبيق.</string>
     <string name="settings_offline_archives_open">فتح صفحة تنزيل القاموس</string>
@@ -101,16 +110,16 @@
 
     <string name="offline_import_phase_download">جاري تنزيل ملفات القاموس...</string>
     <string name="offline_import_phase_prepare">جاري تجهيز الاستيراد...</string>
-    <string name="offline_import_phase_index">جاري فهرسة القاموس المحلي...</string>
-    <string name="offline_import_phase_images">جاري تثبيت الصور المحلية...</string>
+    <string name="offline_import_phase_index">جاري فهرسة القاموس...</string>
+    <string name="offline_import_phase_images">جاري تثبيت الصور...</string>
     <string name="offline_import_success">تم تحميل %1$d كلمة للاستخدام بدون إنترنت.</string>
     <string name="offline_import_success_with_images">تم تحميل %1$d كلمة وتثبيت الصور للاستخدام بدون إنترنت.</string>
-    <string name="offline_images_install_success">تم تثبيت الصور المحلية. ستظهر الصور مع القاموس الحالي.</string>
-    <string name="offline_import_failure">فشل تحميل القاموس المحلي.</string>
+    <string name="offline_images_install_success">تم تثبيت الصور وستظهر داخل المداخل.</string>
+    <string name="offline_import_failure">فشل تجهيز القاموس.</string>
     <string name="offline_import_invalid_zip">ملف القاموس الذي تم تنزيله غير صالح.</string>
-    <string name="offline_dictionary_indexing_title">جاري تجهيز القاموس المحلي</string>
+    <string name="offline_dictionary_indexing_title">جاري تجهيز القاموس</string>
     <string name="offline_dictionary_indexing_message">يتم فهرسة البيانات المدمجة داخل التطبيق. بعد اكتمال الفهرسة سيعمل البحث بدون إنترنت.</string>
-    <string name="offline_dictionary_missing_title">القاموس المحلي غير جاهز</string>
+    <string name="offline_dictionary_missing_title">القاموس غير جاهز</string>
     <string name="offline_dictionary_missing_message">لم يتم العثور على بيانات مفهرسة بعد. أعد محاولة تجهيز القاموس المدمج.</string>
     <string name="offline_dictionary_retry">إعادة تجهيز القاموس</string>
     <string name="offline_download_prompt_title">&#x064A;&#x0644;&#x0632;&#x0645; &#x062A;&#x062D;&#x0645;&#x064A;&#x0644; &#x0627;&#x0644;&#x0642;&#x0627;&#x0645;&#x0648;&#x0633; &#x0627;&#x0644;&#x0645;&#x062D;&#x0644;&#x064A;</string>

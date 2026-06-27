@@ -1,6 +1,7 @@
 package com.shinjikai.dictionary.ui
 
 import android.app.Application
+import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
@@ -23,13 +24,11 @@ import com.shinjikai.dictionary.data.BookmarkItem
 import com.shinjikai.dictionary.data.BookmarkRepository
 import com.shinjikai.dictionary.data.BrowsePagingSource
 import com.shinjikai.dictionary.data.BundledDictionaryInstaller
-import com.shinjikai.dictionary.data.ClientIdStore
 import com.shinjikai.dictionary.data.DictionarySource
 import com.shinjikai.dictionary.data.LocalYomitanSource
 import com.shinjikai.dictionary.data.OFFLINE_IMAGE_DIR_META_KEY
 import com.shinjikai.dictionary.data.RecentSearchStore
 import com.shinjikai.dictionary.data.RelatedWordItem
-import com.shinjikai.dictionary.data.RemoteDictionarySource
 import com.shinjikai.dictionary.data.RawShinjikaiImporter
 import com.shinjikai.dictionary.data.RecentSearchEntry
 import com.shinjikai.dictionary.data.SearchItem
@@ -46,6 +45,8 @@ import com.shinjikai.dictionary.data.extractOfflineArchive
 import com.shinjikai.dictionary.data.extractTarXzStream
 import com.shinjikai.dictionary.data.extractZipStream
 import com.shinjikai.dictionary.data.findOfflineImportPayload
+import com.shinjikai.dictionary.data.replaceStagedDirectoryAtomically
+import com.shinjikai.dictionary.data.stageDirectoryCopy
 import com.shinjikai.dictionary.data.toBrowseSearchItem
 import java.io.File
 import java.io.FileInputStream
@@ -67,23 +68,21 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
-    private val context = app.applicationContext
+    private val context: Context
+        get() = getApplication<Application>().applicationContext
     private val database = AppDatabase.getInstance(context)
     private val settingsStore = SettingsStore(context)
     private val recentSearchStore = RecentSearchStore(context)
     private val bookmarkRepository = BookmarkRepository(database.bookmarkDao(), database.yomitanDao())
-    private val clientId = ClientIdStore.getOrCreate(context)
     private val bundledDictionaryInstaller = BundledDictionaryInstaller(context, database)
     private val searchSpec = MutableStateFlow<SearchRequestSpec?>(null)
     private val searchRefreshNonce = MutableStateFlow(0)
     private var detailsLoadJob: Job? = null
     private var categoriesPreloadJob: Job? = null
-    private var activeUseOfflineMode = settingsStore.readCached().useOfflineMode
-
     val settings: StateFlow<AppSettings> = settingsStore.settingsFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, settingsStore.readCached())
 
-    private var dictionarySource: DictionarySource = createDictionarySource(activeUseOfflineMode)
+    private var dictionarySource: DictionarySource = createDictionarySource()
         set(value) {
             field = value
             repository = ShinjikaiRepository(source = value)
@@ -204,7 +203,9 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
             isBookmarked = selectedItem?.let { item ->
                 bookmarkedItems.any { it.id == item.id }
             } == true,
-            categoryNameById = categoryNameById
+            categoryNameById = categoryNameById,
+            isImportingOfflineData = isImportingOfflineData,
+            offlineImportPhase = offlineImportPhase
         )
 
     val bookmarksUiState: BookmarksUiState
@@ -233,17 +234,13 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         installBundledDictionaryIfNeeded()
-        viewModelScope.launch { settingsStore.setUseOfflineMode(true) }
+        viewModelScope.launch { settingsStore.ensureOfflineMode() }
         refreshOfflineTermCount()
         refreshOfflinePreview()
 
         viewModelScope.launch {
-            settings.collect { newSettings ->
-                if (activeUseOfflineMode != newSettings.useOfflineMode) {
-                    activeUseOfflineMode = newSettings.useOfflineMode
-                    dictionarySource = createDictionarySource(newSettings.useOfflineMode)
-                }
-                ensureCategoriesPreloadedIfNeeded()
+            settings.collect {
+                requestCategoriesPreload()
             }
         }
 
@@ -323,11 +320,11 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         loadingDetails = true
 
         detailsLoadJob = viewModelScope.launch {
-            ensureCategoriesPreloadedIfNeeded()
             val result = repository.loadWordDetails(item.id)
             loadingDetails = false
             result.onSuccess { details = it }
                 .onFailure { detailsError = it.message ?: context.getString(R.string.error_details_load) }
+            requestCategoriesPreload()
         }
     }
 
@@ -397,11 +394,11 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         loadingDetails = true
 
         detailsLoadJob = viewModelScope.launch {
-            ensureCategoriesPreloadedIfNeeded()
             val result = repository.loadWordDetails(id)
             loadingDetails = false
             result.onSuccess { details = it }
                 .onFailure { detailsError = it.message ?: context.getString(R.string.error_details_load) }
+            requestCategoriesPreload()
         }
     }
 
@@ -518,20 +515,11 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val item = withContext(Dispatchers.IO) {
                 database.yomitanDao()
-                    .loadPreviewTerms(limit = 1)
-                    .firstOrNull()
+                    .loadRandomTerm()
                     ?.toBrowseSearchItem()
             }
             item?.let(onEntry)
         }
-    }
-
-    fun setUseOfflineMode(enabled: Boolean) {
-        if (!activeUseOfflineMode) {
-            activeUseOfflineMode = true
-            dictionarySource = createDictionarySource(useOfflineMode = true)
-        }
-        viewModelScope.launch { settingsStore.setUseOfflineMode(true) }
     }
 
     fun retryBundledDictionaryInstall() {
@@ -549,8 +537,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
 
             Log.i(TAG, "Starting bundled dictionary install. force=$force")
             val result = bundledDictionaryInstaller.installIfNeeded(force = force) { phase, progress ->
-                offlineImportPhase = phase
-                offlineImportProgress = progress
+                updateOfflineImportProgress(phase, progress)
             }
 
             isImportingOfflineData = false
@@ -566,7 +553,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
                     categoryNameById = emptyMap()
                     refreshOfflineTermCount()
                     refreshOfflinePreview()
-                    dictionarySource = createDictionarySource(useOfflineMode = true)
+                    dictionarySource = createDictionarySource()
                     searchRefreshNonce.value = searchRefreshNonce.value + 1
                 } else {
                     offlineImportStatus = null
@@ -682,12 +669,9 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun ensureCategoriesPreloadedIfNeeded() {
+    private fun requestCategoriesPreload() {
         if (categoryNameById.isNotEmpty()) return
-        if (categoriesPreloadJob?.isActive == true) {
-            categoriesPreloadJob?.join()
-            return
-        }
+        if (categoriesPreloadJob?.isActive == true) return
         categoriesPreloadJob = viewModelScope.launch {
             repository.loadCategories().onSuccess { response ->
                 categoryNameById = response.categories
@@ -695,6 +679,10 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
                     .filterValues { it.isNotEmpty() }
             }
         }
+    }
+
+    private suspend fun ensureCategoriesPreloadedIfNeeded() {
+        requestCategoriesPreload()
         categoriesPreloadJob?.join()
     }
 
@@ -707,8 +695,10 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 targetDir.mkdirs()
 
-                offlineImportPhase = context.getString(R.string.offline_import_phase_index)
-                offlineImportProgress = 0.15f
+                updateOfflineImportProgress(
+                    context.getString(R.string.offline_import_phase_index),
+                    0.15f
+                )
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     extractZipStream(input.buffered(), targetDir)
                 } ?: error("Unable to read selected zip.")
@@ -741,8 +731,10 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 targetDir.mkdirs()
 
-                offlineImportPhase = context.getString(R.string.offline_import_phase_index)
-                offlineImportProgress = 0.15f
+                updateOfflineImportProgress(
+                    context.getString(R.string.offline_import_phase_index),
+                    0.15f
+                )
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     extractTarXzStream(input.buffered(), targetDir)
                 } ?: error("Unable to read selected archive.")
@@ -767,51 +759,69 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
             "Selected archive does not contain dictionary text, Yomitan term banks, or yomitan_images."
         }
 
-        var installedImages = false
-        if (extractedImagesDir != null) {
-            offlineImportPhase = context.getString(R.string.offline_import_phase_images)
-            offlineImportProgress = offlineImportProgress.coerceAtLeast(0.2f)
-            installPickedOfflineImages(extractedImagesDir)
-            installedImages = true
-        }
-
-        val importedCount = if (jsonlFile != null) {
-            offlineImportPhase = context.getString(R.string.offline_import_phase_index)
-            offlineImportProgress = offlineImportProgress.coerceAtLeast(0.35f)
-            rawShinjikaiImporter.importFromJsonLines(
-                jsonlFile = jsonlFile,
-                sourceLabel = sourceLabel
-            ).getOrThrow()
-        } else if (yomitanDirectory != null) {
-            offlineImportPhase = context.getString(R.string.offline_import_phase_index)
-            offlineImportProgress = offlineImportProgress.coerceAtLeast(0.35f)
-            yomitanImporter.importFromDirectory(
-                directory = yomitanDirectory,
-                sourceLabel = sourceLabel
-            ).getOrThrow()
+        val imageTargetDir = File(context.filesDir, "offline/yomitan_images")
+        val stagedImages = if (extractedImagesDir != null) {
+            updateOfflineImportProgress(
+                context.getString(R.string.offline_import_phase_images),
+                0.2f
+            )
+            stageDirectoryCopy(extractedImagesDir, imageTargetDir)
         } else {
-            0
+            null
         }
 
-        return OfflineImportResult(
-            importedCount = importedCount,
-            installedImages = installedImages
-        )
+        try {
+            val importedCount = if (jsonlFile != null) {
+                updateOfflineImportProgress(
+                    context.getString(R.string.offline_import_phase_index),
+                    0.35f
+                )
+                rawShinjikaiImporter.importFromJsonLines(
+                    jsonlFile = jsonlFile,
+                    sourceLabel = sourceLabel
+                ).getOrThrow()
+            } else if (yomitanDirectory != null) {
+                updateOfflineImportProgress(
+                    context.getString(R.string.offline_import_phase_index),
+                    0.35f
+                )
+                yomitanImporter.importFromDirectory(
+                    directory = yomitanDirectory,
+                    sourceLabel = sourceLabel
+                ).getOrThrow()
+            } else {
+                0
+            }
+
+            if (stagedImages != null) {
+                replaceStagedDirectoryAtomically(stagedImages, imageTargetDir)
+                database.yomitanDao().upsertMeta(
+                    YomitanMetaEntity(
+                        key = OFFLINE_IMAGE_DIR_META_KEY,
+                        value = imageTargetDir.absolutePath.replace('\\', '/')
+                    )
+                )
+            }
+
+            return OfflineImportResult(
+                importedCount = importedCount,
+                installedImages = stagedImages != null
+            )
+        } finally {
+            if (stagedImages?.exists() == true) {
+                stagedImages.deleteRecursively()
+            }
+        }
     }
 
-    private suspend fun installPickedOfflineImages(sourceDir: File) {
-        val targetDir = File(context.filesDir, "offline/yomitan_images")
-        if (targetDir.exists()) {
-            targetDir.deleteRecursively()
+    private suspend fun updateOfflineImportProgress(
+        phase: String,
+        progress: Float
+    ) {
+        withContext(Dispatchers.Main.immediate) {
+            offlineImportPhase = phase
+            offlineImportProgress = maxOf(offlineImportProgress, progress.coerceIn(0f, 1f))
         }
-        targetDir.parentFile?.mkdirs()
-        sourceDir.copyRecursively(targetDir, overwrite = true)
-        database.yomitanDao().upsertMeta(
-            YomitanMetaEntity(
-                key = OFFLINE_IMAGE_DIR_META_KEY,
-                value = targetDir.absolutePath.replace('\\', '/')
-            )
-        )
     }
 
     private fun resolvePickedArchiveName(uri: Uri): String? {
@@ -915,7 +925,7 @@ class ShinjikaiViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun createDictionarySource(useOfflineMode: Boolean): DictionarySource {
+    private fun createDictionarySource(): DictionarySource {
         return LocalYomitanSource(database.yomitanDao())
     }
 

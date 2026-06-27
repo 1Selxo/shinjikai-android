@@ -58,40 +58,55 @@ class LocalYomitanSourceTest {
     }
 
     private class FakeYomitanDao : YomitanDao {
-        var ftsResults: List<YomitanTermEntity> = emptyList()
-        var glossaryFtsResults: List<YomitanTermEntity> = emptyList()
-        var directSearchResults: List<YomitanTermEntity> = emptyList()
+        var ftsResults: List<YomitanTermListRow> = emptyList()
+        var glossaryFtsResults: List<YomitanTermListRow> = emptyList()
+        var directSearchResults: List<YomitanTermListRow> = emptyList()
         var lastFtsQuery: String? = null
         var lastGlossaryFtsQuery: String? = null
         val ftsQueries = mutableListOf<String>()
 
-        override suspend fun search(term: String, prefix: String, limit: Int): List<YomitanTermEntity> = directSearchResults
+        override suspend fun search(term: String, prefix: String, limit: Int): List<YomitanTermListRow> = directSearchResults
 
-        override suspend fun searchPaged(term: String, prefix: String, limit: Int, offset: Int): List<YomitanTermEntity> =
+        override suspend fun searchPaged(term: String, prefix: String, limit: Int, offset: Int): List<YomitanTermListRow> =
             directSearchResults.drop(offset).take(limit)
 
-        override suspend fun searchFts(matchQuery: String, limit: Int): List<YomitanTermEntity> {
+        override suspend fun searchFts(matchQuery: String, limit: Int): List<YomitanTermListRow> {
             lastFtsQuery = matchQuery
             ftsQueries += matchQuery
             return ftsResults.take(limit)
         }
 
-        override suspend fun searchGlossaryFts(matchQuery: String, limit: Int): List<YomitanTermEntity> {
+        override suspend fun searchGlossaryFts(matchQuery: String, limit: Int): List<YomitanTermListRow> {
             lastGlossaryFtsQuery = matchQuery
             return glossaryFtsResults.take(limit)
         }
 
-        override suspend fun searchArabic(term: String, normalizedTerm: String, limit: Int): List<YomitanTermEntity> =
+        override suspend fun searchArabic(term: String, normalizedTerm: String, limit: Int): List<YomitanTermListRow> =
             directSearchResults.take(limit)
 
         override suspend fun countSearchMatches(term: String): Int = directSearchResults.size
 
         override suspend fun getById(id: Int): YomitanTermEntity? = null
 
+        override suspend fun getByIds(ids: List<Int>): List<YomitanTermListRow> = emptyList()
+
         override suspend fun loadAllTerms(): List<YomitanTermEntity> = emptyList()
 
-        override suspend fun browseTermsPaged(limit: Int, offset: Int): List<YomitanTermEntity> =
-            directSearchResults.drop(offset).take(limit)
+        override suspend fun browseTermsAfter(
+            lastReading: String?,
+            lastExpression: String?,
+            lastId: Int?,
+            limit: Int
+        ): List<YomitanTermListRow> = directSearchResults
+            .sortedWith(compareBy<YomitanTermListRow>({ it.reading }, { it.expression }, { it.id }))
+            .dropWhile { row ->
+                lastReading != null && (
+                    row.reading < lastReading ||
+                        (row.reading == lastReading && row.expression < lastExpression.orEmpty()) ||
+                        (row.reading == lastReading && row.expression == lastExpression && row.id <= (lastId ?: 0))
+                    )
+            }
+            .take(limit)
 
         override suspend fun upsertCategoryRefs(items: List<YomitanTermCategoryEntity>) = Unit
 
@@ -99,7 +114,7 @@ class LocalYomitanSourceTest {
 
         override suspend fun countCategoryRefs(): Int = 0
 
-        override suspend fun loadCategoryTermsPaged(categoryId: Int, limit: Int, offset: Int): List<YomitanTermEntity> = emptyList()
+        override suspend fun loadCategoryTermsPaged(categoryId: Int, limit: Int, offset: Int): List<YomitanTermListRow> = emptyList()
 
         override suspend fun countCategoryTerms(categoryId: Int): Int = 0
 
@@ -113,7 +128,9 @@ class LocalYomitanSourceTest {
 
         override suspend fun countTerms(): Int = 0
 
-        override suspend fun loadPreviewTerms(limit: Int): List<YomitanTermEntity> = emptyList()
+        override suspend fun loadPreviewTerms(limit: Int): List<YomitanTermListRow> = emptyList()
+
+        override suspend fun loadRandomTerm(): YomitanTermListRow? = directSearchResults.firstOrNull()
 
         override suspend fun upsertMeta(meta: YomitanMetaEntity) = Unit
 
@@ -128,7 +145,7 @@ class LocalYomitanSourceTest {
             expression: String,
             reading: String = expression,
             glossary: String
-        ) = YomitanTermEntity(
+        ) = YomitanTermListRow(
             id = id,
             expression = expression,
             reading = reading,

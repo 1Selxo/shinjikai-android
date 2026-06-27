@@ -74,4 +74,30 @@ class OfflineImageSupportTest {
         assertEquals("https://example.com/image.jpg", extracted)
         assertTrue(extracted!!.startsWith("https://"))
     }
+
+    @Test
+    fun `official image urls resolve to bundled image files`() {
+        val imageRoot = File("build/test-offline/yomitan_images").absolutePath.replace('\\', '/')
+
+        val resolved = resolveOfflineImagePath(
+            "https://shinjikai.app/static/word_pictures/gallery/cat.jpg",
+            imageRoot
+        )
+
+        assertEquals("$imageRoot/gallery/cat.jpg", resolved)
+    }
+
+    @Test
+    fun `picture captions survive canonicalization and path resolution`() {
+        val imageRoot = File("build/test-offline/yomitan_images").absolutePath.replace('\\', '/')
+        val picture = JsonParser.parseString(
+            """{"Filename":"4252.jpg","Description":"شجرة كرز"}"""
+        )
+
+        val normalized = normalizeStoredPictureElement(picture)!!
+        val resolved = resolveStoredPictureElement(normalized, imageRoot)!!
+
+        assertEquals("شجرة كرز", extractPictureDescription(resolved))
+        assertEquals("$imageRoot/4252.jpg", extractPictureReference(resolved))
+    }
 }

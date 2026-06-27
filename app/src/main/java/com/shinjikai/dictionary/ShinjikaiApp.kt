@@ -211,10 +211,11 @@ fun ShinjikaiApp(
             }
             Surface(color = MaterialTheme.colorScheme.background) {
                 Box(modifier = Modifier.fillMaxSize()) {
+                    Column(modifier = Modifier.fillMaxSize()) {
                     NavHost(
                         navController = navController,
                         startDestination = AppRoute.Search.route,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.weight(1f)
                     ) {
                         composable(
                             route = AppRoute.Search.route,
@@ -456,10 +457,7 @@ fun ShinjikaiApp(
                     }
 
                     if (currentScreen in setOf(Screen.Search, Screen.Browse, Screen.History, Screen.Bookmarks, Screen.Settings)) {
-                        Box(
-                            modifier = Modifier.align(Alignment.BottomCenter)
-                        ) {
-                            PrimaryBottomBar(
+                        PrimaryBottomBar(
                                 currentScreen = currentScreen ?: Screen.Search,
                                 onSearchClick = handleSearchTabClick,
                                 onBrowseClick = {
@@ -479,7 +477,7 @@ fun ShinjikaiApp(
                                     navController.navigateToPrimary(AppRoute.Settings)
                                 }
                             )
-                        }
+                    }
                     }
 
                     if (viewModel.settingsUiState.showIntroduction) {

@@ -26,7 +26,9 @@ data class DetailUiState(
     val details: WordDetailsResponse? = null,
     val selectedItem: SearchItem? = null,
     val isBookmarked: Boolean = false,
-    val categoryNameById: Map<Int, String> = emptyMap()
+    val categoryNameById: Map<Int, String> = emptyMap(),
+    val isImportingOfflineData: Boolean = false,
+    val offlineImportPhase: String? = null
 )
 
 data class BookmarksUiState(

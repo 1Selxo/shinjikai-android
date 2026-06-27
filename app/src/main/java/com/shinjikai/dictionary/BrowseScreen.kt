@@ -20,7 +20,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,65 +47,34 @@ fun BrowseScreenContent(
     val refreshState = entries.loadState.refresh
 
     Scaffold(
-        containerColor = Color.Transparent,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.browse_title)) },
-                actions = {
-                    FilledTonalIconButton(
-                        onClick = { viewModel.openRandomDictionaryEntry(onOpenDetails) }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Shuffle,
-                            contentDescription = stringResource(R.string.browse_random)
-                        )
-                    }
-                },
-                colors = shinjikaiTopAppBarColors()
-            )
-        }
+        containerColor = Color.Transparent
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 10.dp, bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             item(key = "browse-header") {
-                ShinjikaiCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ShinjikaiUi.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.38f)
-                    ),
-                    border = ShinjikaiUi.cardBorder(alpha = 0.28f)
-                ) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalAlignment = Alignment.End
-                    ) {
+                ShinjikaiPageHeader(
+                    title = stringResource(R.string.browse_title),
+                    subtitle = "${stringResource(R.string.browse_subtitle)} · ${
+                        stringResource(R.string.browse_count, totalEntries)
+                    }",
+                    icon = Icons.AutoMirrored.Filled.MenuBook,
+                    action = {
+                        FilledTonalIconButton(
+                            onClick = { viewModel.openRandomDictionaryEntry(onOpenDetails) }
+                        ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = stringResource(R.string.browse_subtitle),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Right,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(
-                            text = stringResource(R.string.browse_count, totalEntries),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = ShinjikaiUi.mutedTextColor(),
-                            textAlign = TextAlign.Right,
-                            modifier = Modifier.fillMaxWidth()
+                            imageVector = Icons.Default.Shuffle,
+                            contentDescription = stringResource(R.string.browse_random)
                         )
                     }
-                }
+                    }
+                )
             }
 
             if (refreshState is LoadState.Loading) {

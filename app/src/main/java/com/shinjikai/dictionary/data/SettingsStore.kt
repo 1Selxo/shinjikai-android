@@ -40,7 +40,7 @@ class SettingsStore(
         return AppSettings(
             themeMode = readCachedThemeMode(),
             useDynamicColor = cachePrefs.getBoolean("use_dynamic_color", false),
-            useOfflineMode = cachePrefs.getBoolean("use_offline_mode", true),
+            useOfflineMode = true,
             hasSeenIntroduction = resolveHasSeenIntroduction(
                 legacySeen = cachePrefs.getBoolean("has_seen_introduction", false)
             ),
@@ -61,7 +61,7 @@ class SettingsStore(
                     legacyDarkMode = prefs[Keys.DARK_MODE]
                 ),
                 useDynamicColor = prefs[Keys.USE_DYNAMIC_COLOR] ?: false,
-                useOfflineMode = prefs[Keys.USE_OFFLINE_MODE] ?: true,
+                useOfflineMode = true,
                 hasSeenIntroduction = resolveHasSeenIntroduction(
                     legacySeen = prefs[Keys.HAS_SEEN_INTRODUCTION] ?: false
                 ),
@@ -74,7 +74,7 @@ class SettingsStore(
                 .putString("theme_mode", settings.themeMode.storageKey)
                 .putBoolean("dark_mode", settings.themeMode == AppThemeMode.Dark)
                 .putBoolean("use_dynamic_color", settings.useDynamicColor)
-                .putBoolean("use_offline_mode", settings.useOfflineMode)
+                .putBoolean("use_offline_mode", true)
                 .putBoolean("has_seen_introduction", settings.hasSeenIntroduction)
                 .putString("selected_anki_deck_name", settings.selectedAnkiDeckName)
                 .apply()
@@ -101,9 +101,9 @@ class SettingsStore(
         cachePrefs.edit().putBoolean("use_dynamic_color", enabled).apply()
     }
 
-    suspend fun setUseOfflineMode(enabled: Boolean) {
-        context.settingsDataStore.edit { prefs -> prefs[Keys.USE_OFFLINE_MODE] = enabled }
-        cachePrefs.edit().putBoolean("use_offline_mode", enabled).apply()
+    suspend fun ensureOfflineMode() {
+        context.settingsDataStore.edit { prefs -> prefs[Keys.USE_OFFLINE_MODE] = true }
+        cachePrefs.edit().putBoolean("use_offline_mode", true).apply()
     }
 
     suspend fun setHasSeenIntroduction(seen: Boolean) {

@@ -8,30 +8,47 @@ private val BROWSE_MULTISPACE_REGEX = Regex("""\s{2,}""")
 
 class BrowsePagingSource(
     private val yomitanDao: YomitanDao
-) : PagingSource<Int, SearchItem>() {
-    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SearchItem> {
-        val offset = params.key ?: 0
+) : PagingSource<BrowsePageKey, SearchItem>() {
+    override suspend fun load(
+        params: LoadParams<BrowsePageKey>
+    ): LoadResult<BrowsePageKey, SearchItem> {
+        val key = params.key
         val limit = params.loadSize.coerceAtLeast(30)
         return runCatching {
-            val rows = yomitanDao.browseTermsPaged(limit = limit, offset = offset)
+            val rows = yomitanDao.browseTermsAfter(
+                lastReading = key?.reading,
+                lastExpression = key?.expression,
+                lastId = key?.id,
+                limit = limit
+            )
             LoadResult.Page(
-                data = rows.map(YomitanTermEntity::toBrowseSearchItem),
-                prevKey = offset.takeIf { it > 0 }?.let { (it - limit).coerceAtLeast(0) },
-                nextKey = (offset + rows.size).takeIf { rows.size == limit }
+                data = rows.map(YomitanTermListRow::toBrowseSearchItem),
+                prevKey = null,
+                nextKey = rows.lastOrNull()
+                    ?.takeIf { rows.size == limit }
+                    ?.let { row ->
+                        BrowsePageKey(
+                            reading = row.reading,
+                            expression = row.expression,
+                            id = row.id
+                        )
+                    }
             )
         }.getOrElse { throwable ->
             LoadResult.Error(throwable)
         }
     }
 
-    override fun getRefreshKey(state: PagingState<Int, SearchItem>): Int? {
-        val anchor = state.anchorPosition ?: return null
-        val page = state.closestPageToPosition(anchor) ?: return null
-        return page.prevKey?.plus(state.config.pageSize) ?: page.nextKey?.minus(state.config.pageSize)
-    }
+    override fun getRefreshKey(state: PagingState<BrowsePageKey, SearchItem>): BrowsePageKey? = null
 }
 
-internal fun YomitanTermEntity.toBrowseSearchItem(): SearchItem {
+data class BrowsePageKey(
+    val reading: String,
+    val expression: String,
+    val id: Int
+)
+
+internal fun YomitanTermListRow.toBrowseSearchItem(): SearchItem {
     return SearchItem(
         id = id,
         kana = reading,

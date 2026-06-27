@@ -2,6 +2,9 @@ package com.shinjikai.dictionary.data
 
 import com.google.gson.Gson
 import com.google.gson.JsonArray
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 private val BULLET_PREFIX_REGEX = Regex("""(?m)^\s*[\uD83D\uDD39\u25AA\u2022\u25CF\u25E6]\s*""")
 private val MULTISPACE_REGEX = Regex("""\s{2,}""")
 private val ARABIC_DIACRITICS_REGEX = Regex("""[\u064B-\u065F\u0670\u06D6-\u06ED]""")
@@ -9,11 +12,56 @@ private val ARABIC_ALEF_VARIANTS_REGEX = Regex("""[أإآٱ]""")
 private val NON_LETTER_NUMBER_SPACE_REGEX = Regex("""[^\p{L}\p{N}\s]""")
 private val SENTENCE_SPLIT_REGEX = Regex("""[\s\u3000,،;；、。.!?！？()\[\]{}<>\"“”'‘’/\\]+""")
 private val JAPANESE_PARTICLES = listOf("から", "まで", "より", "だけ", "ほど", "など", "って", "では", "には", "は", "が", "を", "に", "で", "と", "へ", "も", "や", "か", "の")
+private const val DETAIL_CACHE_SIZE = 64
+private const val SEARCH_PLAN_CACHE_SIZE = 64
+
+private data class DetailCacheKey(
+    val id: Int,
+    val detailsHash: Int,
+    val imageRoot: String
+)
+
+private data class JapaneseSearchPlan(
+    val variantsBySegment: Map<String, List<String>>,
+    val searchCandidates: List<String>,
+    val ftsQueries: List<String>
+) {
+    companion object {
+        val Empty = JapaneseSearchPlan(
+            variantsBySegment = emptyMap(),
+            searchCandidates = emptyList(),
+            ftsQueries = emptyList()
+        )
+    }
+}
+
+private suspend inline fun <T> runIoCatching(crossinline block: suspend () -> T): Result<T> {
+    return try {
+        Result.success(withContext(Dispatchers.IO) { block() })
+    } catch (throwable: CancellationException) {
+        throw throwable
+    } catch (throwable: Throwable) {
+        Result.failure(throwable)
+    }
+}
 
 class LocalYomitanSource(
     private val yomitanDao: YomitanDao,
     private val gson: Gson = Gson()
 ) : DictionarySource {
+    private val detailCache = object : LinkedHashMap<DetailCacheKey, WordDetailsResponse>(DETAIL_CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<DetailCacheKey, WordDetailsResponse>?): Boolean {
+            return size > DETAIL_CACHE_SIZE
+        }
+    }
+    private val searchPlanCache = object : LinkedHashMap<String, JapaneseSearchPlan>(SEARCH_PLAN_CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, JapaneseSearchPlan>?): Boolean {
+            return size > SEARCH_PLAN_CACHE_SIZE
+        }
+    }
+    private val categoriesCacheLock = Any()
+    private var cachedCategories: LoadCategoriesResponse? = null
+
     override suspend fun searchWords(term: String, page: Int): Result<SearchWordsResponse> {
         val query = term.trim()
         if (query.isBlank()) return Result.success(SearchWordsResponse(items = emptyList()))
@@ -21,27 +69,15 @@ class LocalYomitanSource(
         val pageSize = 80
         val offset = pageIndex * pageSize
 
-        return runCatching {
+        return runIoCatching {
             val isArabic = isArabicQuery(query)
-            val normalizedQueries = if (!isArabic) buildNormalizedJapaneseQueries(query) else emptyList()
-            val japaneseSearchSegments = if (!isArabic) {
-                normalizedQueries.flatMap(::extractSearchSegments).distinct()
-            } else {
-                emptyList()
-            }
-            val japaneseSearchCandidates = if (!isArabic) {
-                normalizedQueries.flatMap(::buildJapaneseSearchCandidates).distinct()
-            } else {
-                emptyList()
-            }
-            val ftsQueries = if (!isArabic) {
-                normalizedQueries.flatMap(::buildGenericFtsQueries).distinct()
-            } else {
-                emptyList()
-            }
+            val japaneseSearchPlan = if (!isArabic) getJapaneseSearchPlan(query) else JapaneseSearchPlan.Empty
+            val japaneseVariantsBySegment = japaneseSearchPlan.variantsBySegment
+            val japaneseSearchCandidates = japaneseSearchPlan.searchCandidates
+            val ftsQueries = japaneseSearchPlan.ftsQueries
 
-            val allRows: List<YomitanTermEntity>
-            val pagedRowsDirect: List<YomitanTermEntity>?
+            val allRows: List<YomitanTermListRow>
+            val pagedRowsDirect: List<YomitanTermListRow>?
             val totalCountDirect: Int?
 
             if (isArabic) {
@@ -78,7 +114,7 @@ class LocalYomitanSource(
                         score < Int.MAX_VALUE && glossary.isNotBlank()
                     }
                     .sortedWith(
-                        compareBy<Triple<YomitanTermEntity, String, Int>> { it.third }
+                        compareBy<Triple<YomitanTermListRow, String, Int>> { it.third }
                             .thenBy { it.second.length }
                             .thenBy { it.first.id }
                     )
@@ -101,7 +137,9 @@ class LocalYomitanSource(
                     }
                 allRows = ftsRows
                     .sortedWith(
-                        compareByDescending<YomitanTermEntity> { scoreJapaneseSegmentMatches(japaneseSearchSegments, it) }
+                        compareByDescending<YomitanTermListRow> {
+                            scoreJapaneseSegmentMatches(japaneseVariantsBySegment.values, it)
+                        }
                             .thenBy { rankJapaneseQuery(japaneseSearchCandidates, it) }
                             .thenBy { it.id }
                     )
@@ -138,49 +176,95 @@ class LocalYomitanSource(
     }
 
     override suspend fun loadWordDetails(id: Int): Result<WordDetailsResponse> {
-        return runCatching {
+        return runIoCatching {
             val row = yomitanDao.getById(id)
                 ?: error("No local entry found for id=$id")
             val imageRoot = yomitanDao.getMetaValue(OFFLINE_IMAGE_DIR_META_KEY)
                 ?.takeIf { it.isNotBlank() }
-            row.detailsJson
+            val cacheKey = DetailCacheKey(
+                id = row.id,
+                detailsHash = row.detailsJson?.hashCode() ?: 0,
+                imageRoot = imageRoot.orEmpty()
+            )
+            getCachedDetails(cacheKey)?.let { return@runIoCatching it }
+
+            val response = row.detailsJson
                 ?.takeIf { it.isNotBlank() }
                 ?.let { serialized ->
-                    return@runCatching gson.fromJson(serialized, WordDetailsResponse::class.java)
+                    gson.fromJson(serialized, WordDetailsResponse::class.java)
                         .withResolvedOfflineImages(imageRoot)
+                        .withResolvedSentenceWordLinks()
                 }
-            WordDetailsResponse(
-                word = WordDetailsWord(
-                    id = row.id,
-                    kana = row.reading,
-                    writings = listOf(Writing(text = row.expression)),
-                    meanings = listOf(
-                        Meaning(
-                            arabic = cleanGlossary(row.glossary),
-                            note = row.note
-                        )
-                    ),
-                    jlpt = 0
+                ?: WordDetailsResponse(
+                    word = WordDetailsWord(
+                        id = row.id,
+                        kana = row.reading,
+                        writings = listOf(Writing(text = row.expression)),
+                        meanings = listOf(
+                            Meaning(
+                                arabic = cleanGlossary(row.glossary),
+                                note = row.note
+                            )
+                        ),
+                        jlpt = 0
+                    )
                 )
-            )
+            putCachedDetails(cacheKey, response)
+            response
         }
     }
 
+    private suspend fun WordDetailsResponse.withResolvedSentenceWordLinks(): WordDetailsResponse {
+        val examples = sentenceMap.orEmpty().values + sentenceSearch
+        val linkIds = examples
+            .asSequence()
+            .flatMap { it.wordLinks.orEmpty().asSequence() }
+            .map { it.wordId }
+            .filter { it > 0 }
+            .distinct()
+            .toList()
+        if (linkIds.isEmpty()) return this
+
+        val termsById = yomitanDao.getByIds(linkIds).associateBy { it.id }
+        fun enrich(example: SentenceExample): SentenceExample {
+            val enrichedLinks = example.wordLinks?.map { link ->
+                val term = termsById[link.wordId] ?: return@map link
+                link.copy(
+                    text = link.text.ifBlank { term.expression },
+                    kana = link.kana.ifBlank { term.reading }
+                )
+            }
+            return example.copy(wordLinks = enrichedLinks)
+        }
+
+        return copy(
+            sentenceMap = sentenceMap?.mapValues { (_, example) -> enrich(example) },
+            sentenceSearch = sentenceSearch.map(::enrich)
+        )
+    }
+
     override suspend fun loadCategories(): Result<LoadCategoriesResponse> {
-        return runCatching {
+        return runIoCatching {
+            synchronized(categoriesCacheLock) {
+                cachedCategories?.let { return@runIoCatching it }
+            }
             val categoriesJson = yomitanDao.getMetaValue("categories_json").orEmpty()
-            if (categoriesJson.isBlank()) {
+            val response = if (categoriesJson.isBlank()) {
                 LoadCategoriesResponse()
             } else {
                 LoadCategoriesResponse(categories = parseCategoryRefs(categoriesJson))
             }
+            synchronized(categoriesCacheLock) {
+                cachedCategories = response
+            }
+            response
         }
     }
 
     override suspend fun loadCategory(id: Int, page: Int): Result<LoadCategoryResponse> {
-        return runCatching {
+        return runIoCatching {
             val categories = loadCategories().getOrThrow().categories
-            val category = categories.firstOrNull { it.id == id } ?: CategoryRef(id = id, name = "تصنيف محلي")
+            val category = categories.firstOrNull { it.id == id } ?: CategoryRef(id = id, name = "تصنيف")
             val pageIndex = page.coerceAtLeast(0)
             val pageSize = 80
             val offset = pageIndex * pageSize
@@ -204,7 +288,40 @@ class LocalYomitanSource(
         }
     }
 
-    private fun toSearchItem(row: YomitanTermEntity): SearchItem {
+    private fun getCachedDetails(key: DetailCacheKey): WordDetailsResponse? {
+        return synchronized(detailCache) { detailCache[key] }
+    }
+
+    private fun putCachedDetails(key: DetailCacheKey, details: WordDetailsResponse) {
+        synchronized(detailCache) { detailCache[key] = details }
+    }
+
+    private fun getJapaneseSearchPlan(query: String): JapaneseSearchPlan {
+        synchronized(searchPlanCache) {
+            searchPlanCache[query]?.let { return it }
+        }
+
+        val normalizedQueries = buildNormalizedJapaneseQueries(query)
+        val searchSegments = normalizedQueries.flatMap(::extractSearchSegments).distinct()
+        val variantsBySegment = searchSegments.associateWith(::expandJapaneseTokenVariants)
+        val searchCandidates = variantsBySegment.values
+            .asSequence()
+            .flatten()
+            .distinct()
+            .toList()
+        val ftsQueries = variantsBySegment.values
+            .mapNotNull(::buildVariantsFtsQuery)
+            .distinct()
+        val plan = JapaneseSearchPlan(
+            variantsBySegment = variantsBySegment,
+            searchCandidates = searchCandidates,
+            ftsQueries = ftsQueries
+        )
+        synchronized(searchPlanCache) { searchPlanCache[query] = plan }
+        return plan
+    }
+
+    private fun toSearchItem(row: YomitanTermListRow): SearchItem {
         return SearchItem(
             id = row.id,
             kana = row.reading,
@@ -265,7 +382,7 @@ class LocalYomitanSource(
         return if (index >= 0) 100 + index else Int.MAX_VALUE
     }
 
-    private fun rankJapaneseQuery(candidates: List<String>, row: YomitanTermEntity): Int {
+    private fun rankJapaneseQuery(candidates: List<String>, row: YomitanTermListRow): Int {
         if (candidates.isEmpty()) return Int.MAX_VALUE
         candidates.forEachIndexed { index, candidate ->
             val baseRank = index * 10
@@ -279,12 +396,6 @@ class LocalYomitanSource(
         return candidates.size * 10 + 4
     }
 
-    private fun buildGenericFtsQueries(rawQuery: String): List<String> {
-        return extractSearchSegments(rawQuery)
-            .mapNotNull(::buildSegmentFtsQuery)
-            .distinct()
-    }
-
     private fun buildNormalizedJapaneseQueries(rawQuery: String): List<String> {
         return buildList {
             add(rawQuery)
@@ -294,23 +405,15 @@ class LocalYomitanSource(
         }.distinct()
     }
 
-    private fun buildJapaneseSearchCandidates(rawQuery: String): List<String> {
-        return extractSearchSegments(rawQuery)
-            .asSequence()
-            .flatMap { token -> expandJapaneseTokenVariants(token).asSequence() }
-            .distinct()
-            .toList()
-    }
-
-    private fun buildSegmentFtsQuery(token: String): String? {
-        val variants = expandJapaneseTokenVariants(token)
+    private fun buildVariantsFtsQuery(variants: List<String>): String? {
+        val sanitizedVariants = variants
             .mapNotNull(::sanitizeFtsToken)
             .distinct()
 
         return when {
-            variants.isEmpty() -> null
-            variants.size == 1 -> "${variants.first()}*"
-            else -> variants.joinToString(
+            sanitizedVariants.isEmpty() -> null
+            sanitizedVariants.size == 1 -> "${sanitizedVariants.first()}*"
+            else -> sanitizedVariants.joinToString(
                 separator = " OR ",
                 prefix = "(",
                 postfix = ")"
@@ -384,10 +487,13 @@ class LocalYomitanSource(
         return variants.toList()
     }
 
-    private fun scoreJapaneseSegmentMatches(segments: List<String>, row: YomitanTermEntity): Int {
-        if (segments.isEmpty()) return 0
-        return segments.sumOf { segment ->
-            expandJapaneseTokenVariants(segment).maxOfOrNull { variant ->
+    private fun scoreJapaneseSegmentMatches(
+        variantsBySegment: Collection<List<String>>,
+        row: YomitanTermListRow
+    ): Int {
+        if (variantsBySegment.isEmpty()) return 0
+        return variantsBySegment.sumOf { variants ->
+            variants.maxOfOrNull { variant ->
                 when {
                     row.expression == variant -> 120
                     row.reading == variant -> 110
